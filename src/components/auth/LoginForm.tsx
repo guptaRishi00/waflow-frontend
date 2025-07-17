@@ -59,7 +59,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
     try {
       const response = await axios.post(
         import.meta.env.VITE_BASE_URL + "/api/auth/login",
-        { email, password }
+        { email, password },{
+          withCredentials: true
+        }
       );
 
       if (response.status === 200) {
