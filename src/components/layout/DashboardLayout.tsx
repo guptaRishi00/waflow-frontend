@@ -16,7 +16,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   const { user } = useSelector((state: RootState) => state.customerAuth);
 
 
-  console.log('dashboard layout:', user);
+  // console.log('dashboard layout:', user);
   
 
   if (!user) return null;

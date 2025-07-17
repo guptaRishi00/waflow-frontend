@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -24,6 +25,9 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 interface DocumentItem {
   type: DocumentType;
@@ -35,6 +39,7 @@ interface DocumentItem {
   uploadedAt?: string;
   rejectionReason?: string;
   fileUrl?: string; // Added fileUrl to the interface
+  _id?: string; // MongoDB document ID for PDF preview
 }
 
 const getStatusIcon = (status: DocumentItem["status"]) => {
@@ -102,6 +107,7 @@ export const DocumentsPage: React.FC = () => {
             uploadedAt: uploaded?.uploadedAt,
             rejectionReason: uploaded?.rejectionReason,
             fileUrl: uploaded?.fileUrl, // <-- add this line
+            _id: uploaded?._id, // <-- add this line
           };
         });
         setDocuments(merged);
@@ -173,6 +179,7 @@ export const DocumentsPage: React.FC = () => {
           uploadedAt: uploaded?.uploadedAt,
           rejectionReason: uploaded?.rejectionReason,
           fileUrl: uploaded?.fileUrl, // <-- add this line
+          _id: uploaded?._id, // <-- add this line
         };
       });
       setDocuments(merged);
@@ -379,21 +386,37 @@ export const DocumentsPage: React.FC = () => {
       <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
         <DialogContent className="max-w-3xl w-full">
           <DialogTitle>Document Preview</DialogTitle>
-          {previewUrl && previewUrl.match(/\.(jpg|jpeg|png)$/i) ? (
-            <img
-              src={previewUrl}
-              alt="Document Preview"
-              className="max-w-full max-h-[80vh] mx-auto"
-            />
-          ) : previewUrl && previewUrl.match(/\.pdf$/i) ? (
-            <iframe
-              src={previewUrl}
-              title="PDF Preview"
-              className="w-full h-[80vh]"
-            />
-          ) : previewUrl ? (
-            <div className="text-center">Preview not available</div>
-          ) : null}
+          {(() => {
+            // Find the document being previewed
+            const doc = documents.find(
+              d => d.fileUrl === previewUrl
+            );
+            const documentId = doc && doc._id;
+            const pdfUrl = previewUrl && previewUrl.match(/\.pdf$/i) && documentId
+              ? `${import.meta.env.VITE_BASE_URL}/api/document/file/${documentId}`
+              : null;
+            if (previewUrl && previewUrl.match(/\.(jpg|jpeg|png)$/i)) {
+              return (
+                <img
+                  src={previewUrl}
+                  alt="Document Preview"
+                  className="max-w-full max-h-[80vh] mx-auto"
+                />
+              );
+            } else if (pdfUrl) {
+              return (
+                <div style={{ width: '100%', height: '80vh', overflow: 'auto' }}>
+                  <PDFDocument file={pdfUrl} loading={<div>Loading PDF...</div>} error={<div>Failed to load PDF.</div>}>
+                    <PDFPage pageNumber={1} width={800} />
+                  </PDFDocument>
+                </div>
+              );
+            } else if (previewUrl) {
+              return <div className="text-center">Preview not available</div>;
+            } else {
+              return null;
+            }
+          })()}
         </DialogContent>
       </Dialog>
     </div>

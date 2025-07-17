@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ export const AgentDashboard: React.FC = () => {
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
 
+  // console.log('User:', user);
+  
+
   // Fetch applications from backend
   useEffect(() => {
     const fetchApplications = async () => {
@@ -28,6 +31,7 @@ export const AgentDashboard: React.FC = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const apps = response.data.data;
+        // console.log('Fetched applications:', apps); // Log the data
         setApplications(apps);
       } catch (err) {
         console.error('Error fetching applications:', err);
