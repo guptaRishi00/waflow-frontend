@@ -102,7 +102,7 @@ export const BasicInfoPage: React.FC = () => {
     const fetchData = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/api/user/customer/profile`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         // Map backend fields to BasicInfoData
@@ -169,7 +169,7 @@ export const BasicInfoPage: React.FC = () => {
     }
     try {
       await axios.put(
-        `http://localhost:5000/api/application/onboarding/${user.userId}`,
+        `${import.meta.env.VITE_BASE_URL}/api/application/onboarding/${user.userId}`,
         formData,
         {
           headers: { Authorization: `Bearer ${token}` }

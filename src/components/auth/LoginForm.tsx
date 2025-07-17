@@ -58,7 +58,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
+        import.meta.env.VITE_BASE_URL + "/api/auth/login",
         { email, password }
       );
 
@@ -91,7 +91,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
+        import.meta.env.VITE_BASE_URL + "/api/auth/login",
         {
           email: demoEmail,
           password: demoPassword,

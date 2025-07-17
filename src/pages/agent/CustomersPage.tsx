@@ -53,7 +53,7 @@ export const CustomersPage: React.FC = () => {
         console.log('Agent ID:', agentId);
 
         // Fetch all customers
-        const customersResponse = await fetch('http://localhost:5000/api/user/customers', {
+        const customersResponse = await fetch(`${import.meta.env.VITE_BASE_URL}/api/user/customers`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ export const CustomersPage: React.FC = () => {
         // Temporarily comment out applications fetch to isolate the issue
         /*
         // Fetch applications
-        const applicationsResponse = await fetch('http://localhost:5000/api/application/applications', {
+        const applicationsResponse = await fetch(`${import.meta.env.VITE_BASE_URL}/api/application/applications`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',

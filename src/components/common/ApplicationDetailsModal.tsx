@@ -121,7 +121,7 @@ export const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = (
     try {
       console.log('Making request to fetch customer details');
       const response = await axios.get(
-        `http://localhost:5000/api/user/customer/profile`,
+        `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log('Customer details response:', response.data);
@@ -146,7 +146,7 @@ export const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = (
     try {
       console.log('Making request to fetch documents for customer:', application.customer._id);
       const response = await axios.get(
-        `http://localhost:5000/api/document/customer/${application.customer._id}`,
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${application.customer._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log('Documents response:', response.data);

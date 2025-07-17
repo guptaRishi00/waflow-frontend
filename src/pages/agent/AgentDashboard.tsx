@@ -24,7 +24,7 @@ export const AgentDashboard: React.FC = () => {
       
       setLoading(true);
       try {
-        const response = await axios.get("http://localhost:5000/api/application", {
+        const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/application`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const apps = response.data.data;

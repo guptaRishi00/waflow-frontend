@@ -1,13 +1,25 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Upload, FileText, CheckCircle, XCircle, Eye, Download } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { DocumentType } from '@/types';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Upload,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Download,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { DocumentType } from "@/types";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
@@ -18,39 +30,35 @@ interface DocumentItem {
   title: string;
   description: string;
   required: boolean;
-  status: 'not-uploaded' | 'uploaded' | 'verified' | 'rejected';
+  status: "not-uploaded" | "uploaded" | "verified" | "rejected";
   fileName?: string;
   uploadedAt?: string;
   rejectionReason?: string;
   fileUrl?: string; // Added fileUrl to the interface
 }
 
-const getStatusIcon = (status: DocumentItem['status']) => {
+const getStatusIcon = (status: DocumentItem["status"]) => {
   switch (status) {
-    case 'verified':
+    case "verified":
       return <CheckCircle className="h-5 w-5 text-green-600" />;
-    case 'rejected':
+    case "rejected":
       return <XCircle className="h-5 w-5 text-red-600" />;
-    case 'uploaded':
+    case "uploaded":
       return <FileText className="h-5 w-5 text-yellow-600" />;
     default:
       return <Upload className="h-5 w-5 text-gray-400" />;
   }
 };
 
-const getStatusBadge = (status: DocumentItem['status']) => {
+const getStatusBadge = (status: DocumentItem["status"]) => {
   const variants = {
-    'not-uploaded': 'bg-gray-100 text-gray-800',
-    'uploaded': 'bg-yellow-100 text-yellow-800',
-    'verified': 'bg-green-100 text-green-800',
-    'rejected': 'bg-red-100 text-red-800',
+    "not-uploaded": "bg-gray-100 text-gray-800",
+    uploaded: "bg-yellow-100 text-yellow-800",
+    verified: "bg-green-100 text-green-800",
+    rejected: "bg-red-100 text-red-800",
   };
 
-  return (
-    <Badge className={variants[status]}>
-      {status.replace('-', ' ')}
-    </Badge>
-  );
+  return <Badge className={variants[status]}>{status.replace("-", " ")}</Badge>;
 };
 
 export const DocumentsPage: React.FC = () => {
@@ -69,12 +77,14 @@ export const DocumentsPage: React.FC = () => {
         const token = localStorage.getItem("token");
         // 1. Fetch required document types
         const requiredRes = await axios.get(
-          "http://localhost:5000/api/document/required",
+          import.meta.env.VITE_BASE_URL + "/api/document/required",
           { headers: { Authorization: `Bearer ${token}` } }
         );
         // 2. Fetch user's uploaded documents
         const uploadedRes = await axios.get(
-          `http://localhost:5000/api/document/customer/${user?._id || user?.userId}`,
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+            user?._id || user?.userId
+          }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         // 3. Merge the two lists
@@ -82,7 +92,9 @@ export const DocumentsPage: React.FC = () => {
         const uploadedDocs = uploadedRes.data.data; // [{documentType, fileName, status, uploadedAt, ...}]
         // Map required docs, attach upload info if present
         const merged = requiredDocs.map((reqDoc: any) => {
-          const uploaded = uploadedDocs.find((u: any) => u.documentType === reqDoc.type);
+          const uploaded = uploadedDocs.find(
+            (u: any) => u.documentType === reqDoc.type
+          );
           return {
             ...reqDoc,
             status: uploaded ? uploaded.status : "not-uploaded",
@@ -112,14 +124,14 @@ export const DocumentsPage: React.FC = () => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("documentType", documentType); // required
-    formData.append("documentName", file.name);    // required
+    formData.append("documentName", file.name); // required
     formData.append("linkedTo", user?._id || user?.userId || ""); // required
     formData.append("linkedModel", "Customer"); // required
 
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/document/create-document",
+        import.meta.env.VITE_BASE_URL + "/api/document/create-document",
         formData,
         {
           headers: {
@@ -139,17 +151,21 @@ export const DocumentsPage: React.FC = () => {
       setLoading(true);
       // Re-fetch documents
       const requiredRes = await axios.get(
-        "http://localhost:5000/api/document/required",
+        `${import.meta.env.VITE_BASE_URL}/api/document/required`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const uploadedRes = await axios.get(
-        `http://localhost:5000/api/document/customer/${user?._id || user?.userId}`,
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+          user?._id || user?.userId
+        }`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const requiredDocs = requiredRes.data.requiredDocuments;
       const uploadedDocs = uploadedRes.data.data;
       const merged = requiredDocs.map((reqDoc: any) => {
-        const uploaded = uploadedDocs.find((u: any) => u.documentType === reqDoc.type);
+        const uploaded = uploadedDocs.find(
+          (u: any) => u.documentType === reqDoc.type
+        );
         return {
           ...reqDoc,
           status: uploaded ? uploaded.status : "not-uploaded",
@@ -171,12 +187,15 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (documentType: DocumentType, event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (
+    documentType: DocumentType,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type and size
       const maxSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Invalid File Type",
@@ -204,11 +223,19 @@ export const DocumentsPage: React.FC = () => {
     });
   };
 
-  const completedCount = documents.filter(doc => doc.status === 'verified').length;
-  const uploadedCount = documents.filter(doc => doc.status !== 'not-uploaded').length;
+  const completedCount = documents.filter(
+    (doc) => doc.status === "verified"
+  ).length;
+  const uploadedCount = documents.filter(
+    (doc) => doc.status !== "not-uploaded"
+  ).length;
 
   if (loading) {
-    return <div className="p-8 text-center text-lg text-muted-foreground">Loading documents...</div>;
+    return (
+      <div className="p-8 text-center text-lg text-muted-foreground">
+        Loading documents...
+      </div>
+    );
   }
 
   return (
@@ -250,9 +277,7 @@ export const DocumentsPage: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
-                  <div className="mt-1">
-                    {getStatusIcon(document.status)}
-                  </div>
+                  <div className="mt-1">{getStatusIcon(document.status)}</div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
                       <h3 className="font-semibold">{document.title}</h3>
@@ -270,13 +295,15 @@ export const DocumentsPage: React.FC = () => {
                         <span>{document.fileName}</span>
                         <span>•</span>
                         <span>
-                          Uploaded {new Date(document.uploadedAt!).toLocaleDateString()}
+                          Uploaded{" "}
+                          {new Date(document.uploadedAt!).toLocaleDateString()}
                         </span>
                       </div>
                     )}
                     {document.rejectionReason && (
                       <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                        <strong>Rejection Reason:</strong> {document.rejectionReason}
+                        <strong>Rejection Reason:</strong>{" "}
+                        {document.rejectionReason}
                       </div>
                     )}
                   </div>
@@ -308,17 +335,16 @@ export const DocumentsPage: React.FC = () => {
                       htmlFor={`file-${document.type}`}
                       className={`cursor-pointer inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                         uploading === document.type
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
                       }`}
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       {uploading === document.type
-                        ? 'Uploading...'
+                        ? "Uploading..."
                         : document.fileName
-                        ? 'Replace'
-                        : 'Upload'
-                      }
+                        ? "Replace"
+                        : "Upload"}
                     </Label>
                     <Input
                       id={`file-${document.type}`}
@@ -354,9 +380,17 @@ export const DocumentsPage: React.FC = () => {
         <DialogContent className="max-w-3xl w-full">
           <DialogTitle>Document Preview</DialogTitle>
           {previewUrl && previewUrl.match(/\.(jpg|jpeg|png)$/i) ? (
-            <img src={previewUrl} alt="Document Preview" className="max-w-full max-h-[80vh] mx-auto" />
+            <img
+              src={previewUrl}
+              alt="Document Preview"
+              className="max-w-full max-h-[80vh] mx-auto"
+            />
           ) : previewUrl && previewUrl.match(/\.pdf$/i) ? (
-            <iframe src={previewUrl} title="PDF Preview" className="w-full h-[80vh]" />
+            <iframe
+              src={previewUrl}
+              title="PDF Preview"
+              className="w-full h-[80vh]"
+            />
           ) : previewUrl ? (
             <div className="text-center">Preview not available</div>
           ) : null}
