@@ -25,9 +25,9 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import { Document as PDFDocument, Page as PDFPage } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 interface DocumentItem {
   type: DocumentType;
@@ -88,7 +88,7 @@ export const DocumentsPage: React.FC = () => {
         // 2. Fetch user's uploaded documents
         const uploadedRes = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
-            user?._id || user?.userId
+            user?.userId
           }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -388,13 +388,14 @@ export const DocumentsPage: React.FC = () => {
           <DialogTitle>Document Preview</DialogTitle>
           {(() => {
             // Find the document being previewed
-            const doc = documents.find(
-              d => d.fileUrl === previewUrl
-            );
+            const doc = documents.find((d) => d.fileUrl === previewUrl);
             const documentId = doc && doc._id;
-            const pdfUrl = previewUrl && previewUrl.match(/\.pdf$/i) && documentId
-              ? `${import.meta.env.VITE_BASE_URL}/api/document/file/${documentId}`
-              : null;
+            const pdfUrl =
+              previewUrl && previewUrl.match(/\.pdf$/i) && documentId
+                ? `${
+                    import.meta.env.VITE_BASE_URL
+                  }/api/document/file/${documentId}`
+                : null;
             if (previewUrl && previewUrl.match(/\.(jpg|jpeg|png)$/i)) {
               return (
                 <img
@@ -405,8 +406,14 @@ export const DocumentsPage: React.FC = () => {
               );
             } else if (pdfUrl) {
               return (
-                <div style={{ width: '100%', height: '80vh', overflow: 'auto' }}>
-                  <PDFDocument file={pdfUrl} loading={<div>Loading PDF...</div>} error={<div>Failed to load PDF.</div>}>
+                <div
+                  style={{ width: "100%", height: "80vh", overflow: "auto" }}
+                >
+                  <PDFDocument
+                    file={pdfUrl}
+                    loading={<div>Loading PDF...</div>}
+                    error={<div>Failed to load PDF.</div>}
+                  >
                     <PDFPage pageNumber={1} width={800} />
                   </PDFDocument>
                 </div>
