@@ -47,7 +47,7 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<Navigate to="/auth" replace />} />
       <Route
         path="/auth"
         element={

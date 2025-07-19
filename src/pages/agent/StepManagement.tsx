@@ -29,8 +29,14 @@ import {
   Send,
   FileCheck,
 } from "lucide-react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
+import axios from "axios";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 const StepManagement = ({
+  applicationId,
   steps = [],
   status,
   notes,
@@ -40,6 +46,7 @@ const StepManagement = ({
   setAgentNotes,
   handleUpdateStep,
 }: {
+  applicationId: string;
   steps: any[];
   status?: string;
   notes?: any;
@@ -49,6 +56,74 @@ const StepManagement = ({
   setAgentNotes: (notes: string) => void;
   handleUpdateStep: (newStatus?: string) => void;
 }) => {
+  const { token, user } = useSelector((state: RootState) => state.customerAuth);
+  const { toast } = useToast();
+  const [localSteps, setLocalSteps] = useState(steps);
+  const [localNotes, setLocalNotes] = useState(notes || []);
+  const [loading, setLoading] = useState(false);
+
+  // Update step status API integration
+  const updateStepStatus = async (newStatus: string) => {
+    if (!applicationId || !localSteps.length) return;
+    setLoading(true);
+    try {
+      const currentStep = localSteps.find(
+        (step: any) => step.status.toLowerCase() !== "approved"
+      ) || localSteps[localSteps.length - 1];
+      const response = await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/step/${applicationId}`,
+        {
+          stepName: currentStep.stepName,
+          status: newStatus,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setLocalSteps(response.data.application.steps);
+      toast({
+        title: "Step Updated",
+        description: `Step status updated to ${newStatus}`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update step status.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add note API integration
+  const addNote = async () => {
+    if (!applicationId || !agentNotes.trim() || !user?.userId) return;
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/application/note/${applicationId}`,
+        {
+          message: agentNotes,
+          addedBy: user.userId,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setLocalNotes(response.data.notes);
+      setAgentNotes("");
+      toast({
+        title: "Note Added",
+        description: "Your note has been added.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to add note.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   console.log("StepManagement props:", { steps, status, notes });
 
   const getStatusIcon = (status: string) => {
@@ -194,7 +269,7 @@ const StepManagement = ({
                     return actions.map((action) => (
                       <Button
                         key={action.label}
-                        onClick={() => handleUpdateStep(action.newStatus)}
+                        onClick={() => updateStepStatus(action.newStatus)}
                         className="flex items-center gap-2"
                         variant={
                           action.newStatus === "Declined"
@@ -203,6 +278,7 @@ const StepManagement = ({
                             ? "outline"
                             : "default"
                         }
+                        disabled={loading}
                       >
                         {action.label}
                       </Button>
@@ -222,7 +298,15 @@ const StepManagement = ({
                   placeholder="Add notes about this step or any updates for the customer..."
                   rows={3}
                   className="resize-none"
+                  disabled={loading}
                 />
+                <Button
+                  onClick={addNote}
+                  className="mt-2"
+                  disabled={loading || !agentNotes.trim()}
+                >
+                  Add Note
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -297,7 +381,7 @@ const StepManagement = ({
                         return actions.map((action) => (
                           <Button
                             key={action.label}
-                            onClick={() => handleUpdateStep(action.newStatus)}
+                            onClick={() => updateStepStatus(action.newStatus)}
                             className="flex items-center gap-2"
                             variant={
                               action.newStatus === "Declined"
@@ -306,6 +390,7 @@ const StepManagement = ({
                                 ? "outline"
                                 : "default"
                             }
+                            disabled={loading}
                           >
                             {action.label}
                           </Button>
@@ -320,7 +405,7 @@ const StepManagement = ({
         </Card>
 
         {/* Notes */}
-        {Array.isArray(notes) && notes.length > 0 && (
+        {Array.isArray(localNotes) && localNotes.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -331,7 +416,7 @@ const StepManagement = ({
             <CardContent>
               <ScrollArea className="h-[180px]">
                 <div className="space-y-3">
-                  {notes.map((note: any, idx: number) => (
+                  {localNotes.map((note: any, idx: number) => (
                     <div
                       key={idx}
                       className="p-3 bg-muted/30 rounded-md text-sm"

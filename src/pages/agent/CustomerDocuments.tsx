@@ -5,6 +5,7 @@ import axios from "axios";
 interface CustomerDocumentsProps {
   selectedApp: any;
   token: string;
+  onApplicationRefetch?: () => void; // <-- Add this prop
 }
 
 const getFileIcon = (fileUrl: string) => {
@@ -48,10 +49,15 @@ const getStatusBadge = (status: string) => {
 const CustomerDocuments: React.FC<CustomerDocumentsProps> = ({
   selectedApp,
   token,
+  onApplicationRefetch,
 }) => {
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
   const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [rejectingDocId, setRejectingDocId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState<string>("");
+  const [addingNoteDocId, setAddingNoteDocId] = useState<string | null>(null);
+  const [newNote, setNewNote] = useState<string>("");
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -90,7 +96,7 @@ const CustomerDocuments: React.FC<CustomerDocumentsProps> = ({
     fetchDocuments();
   }, [selectedApp, token]);
 
-  const handleStatusUpdate = async (docId: string, status: 'Approved' | 'Rejected') => {
+  const handleStatusUpdate = async (docId: string, status: 'Approved' | 'Rejected', note?: string) => {
     setActionLoading(docId + status);
     try {
       await axios.put(
@@ -98,17 +104,54 @@ const CustomerDocuments: React.FC<CustomerDocumentsProps> = ({
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (status === 'Rejected' && note) {
+        await axios.post(
+          `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
+          { message: note },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
       // Refresh documents after update
       const customerRes = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/api/document/customer/${selectedApp.customer._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setCustomerDocuments(customerRes.data.data || []);
+      // Refetch application data to update step status in real-time
+      if (typeof onApplicationRefetch === 'function') {
+        await onApplicationRefetch();
+      }
     } catch (err) {
       // Optionally show error toast
       console.error('Error updating document status:', err);
     } finally {
       setActionLoading(null);
+      setRejectingDocId(null);
+      setRejectNote("");
+    }
+  };
+
+  const handleAddNote = async (docId: string) => {
+    if (!newNote.trim()) return;
+    setActionLoading(docId + 'note');
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
+        { message: newNote },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Refresh documents after adding note
+      const customerRes = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${selectedApp.customer._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setCustomerDocuments(customerRes.data.data || []);
+    } catch (err) {
+      console.error('Error adding note:', err);
+    } finally {
+      setActionLoading(null);
+      setAddingNoteDocId(null);
+      setNewNote("");
     }
   };
 
@@ -133,11 +176,21 @@ const CustomerDocuments: React.FC<CustomerDocumentsProps> = ({
                     Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
                   </p>
                 )}
-                {doc.rejectionReason && (
-                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                    <p className="text-sm text-red-700">
-                      <strong>Rejection Reason:</strong> {doc.rejectionReason}
-                    </p>
+                {/* Show notes if present */}
+                {doc.notes && doc.notes.length > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-50 border rounded">
+                    <strong>Notes:</strong>
+                    <ul>
+                      {doc.notes.map((note: any, idx: number) => (
+                        <li key={idx}>
+                          <span className="font-semibold">{note.addedByRole === 'agent' || note.addedByRole === 'admin' ? 'Agent' : 'Customer'}:</span>
+                          <span> {note.message}</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {note.timestamp ? new Date(note.timestamp).toLocaleString() : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -159,14 +212,78 @@ const CustomerDocuments: React.FC<CustomerDocumentsProps> = ({
                   >
                     {actionLoading === doc._id + 'Approved' ? 'Approving...' : 'Approve'}
                   </button>
-                  <button
-                    className="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs disabled:opacity-50"
-                    disabled={actionLoading === doc._id + 'Rejected'}
-                    onClick={() => handleStatusUpdate(doc._id, 'Rejected')}
-                  >
-                    {actionLoading === doc._id + 'Rejected' ? 'Rejecting...' : 'Reject'}
-                  </button>
+                  {rejectingDocId === doc._id ? (
+                    <div className="flex flex-col gap-2 ml-2">
+                      <textarea
+                        className="border rounded p-1 text-xs"
+                        placeholder="Enter rejection note..."
+                        value={rejectNote}
+                        onChange={e => setRejectNote(e.target.value)}
+                        rows={2}
+                        style={{ minWidth: 180 }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className="px-2 py-1 bg-red-500 text-white rounded text-xs disabled:opacity-50"
+                          disabled={actionLoading === doc._id + 'Rejected' || !rejectNote.trim()}
+                          onClick={() => handleStatusUpdate(doc._id, 'Rejected', rejectNote)}
+                        >
+                          {actionLoading === doc._id + 'Rejected' ? 'Rejecting...' : 'Submit Rejection'}
+                        </button>
+                        <button
+                          className="px-2 py-1 bg-gray-300 text-gray-800 rounded text-xs"
+                          onClick={() => { setRejectingDocId(null); setRejectNote(""); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs disabled:opacity-50"
+                      disabled={actionLoading === doc._id + 'Rejected'}
+                      onClick={() => setRejectingDocId(doc._id)}
+                    >
+                      Reject
+                    </button>
+                  )}
                 </>
+              )}
+              {/* Add Note button for any status */}
+              {addingNoteDocId === doc._id ? (
+                <div className="flex flex-col gap-2 ml-2">
+                  <textarea
+                    className="border rounded p-1 text-xs"
+                    placeholder="Enter note for customer..."
+                    value={newNote}
+                    onChange={e => setNewNote(e.target.value)}
+                    rows={2}
+                    style={{ minWidth: 180 }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      className="px-2 py-1 bg-blue-500 text-white rounded text-xs disabled:opacity-50"
+                      disabled={actionLoading === doc._id + 'note' || !newNote.trim()}
+                      onClick={() => handleAddNote(doc._id)}
+                    >
+                      {actionLoading === doc._id + 'note' ? 'Adding...' : 'Add Note'}
+                    </button>
+                    <button
+                      className="px-2 py-1 bg-gray-300 text-gray-800 rounded text-xs"
+                      onClick={() => { setAddingNoteDocId(null); setNewNote(""); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="ml-2 px-2 py-1 bg-blue-500 text-white rounded text-xs disabled:opacity-50"
+                  disabled={actionLoading === doc._id + 'note'}
+                  onClick={() => setAddingNoteDocId(doc._id)}
+                >
+                  Add Note
+                </button>
               )}
             </div>
           </div>

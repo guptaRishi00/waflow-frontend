@@ -102,7 +102,7 @@ export const BasicInfoPage: React.FC = () => {
     const fetchData = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile/${user.userId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         // Map backend fields to BasicInfoData

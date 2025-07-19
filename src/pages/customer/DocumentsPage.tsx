@@ -40,6 +40,7 @@ interface DocumentItem {
   rejectionReason?: string;
   fileUrl?: string; // Added fileUrl to the interface
   _id?: string; // MongoDB document ID for PDF preview
+  notes?: { message: string; addedByRole?: string; timestamp: string }[]; // Added notes to the interface
 }
 
 const getStatusIcon = (status: DocumentItem["status"]) => {
@@ -71,71 +72,111 @@ export const DocumentsPage: React.FC = () => {
   const [uploading, setUploading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user } = useSelector((state: RootState) => state.customerAuth);
+  const { user, token } = useSelector((state: RootState) => state.customerAuth);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [steps, setSteps] = useState<{ stepName: string; status: string }[]>([]);
+  const [selectedStep, setSelectedStep] = useState<string>("");
+  const [selectedSteps, setSelectedSteps] = useState<{ [docType: string]: string }>({});
+  const [addingNoteDocId, setAddingNoteDocId] = useState<string | null>(null);
+  const [newNote, setNewNote] = useState<string>("");
+
+  // Helper to fetch and merge required/uploaded documents
+  const fetchAndMergeDocuments = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch required document types
+      const requiredRes = await axios.get(
+        import.meta.env.VITE_BASE_URL + "/api/document/required",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // 2. Fetch user's uploaded documents
+      const uploadedRes = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${user?.userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // 3. Merge the two lists
+      const requiredDocs = requiredRes.data.requiredDocuments; // [{type, title, description, required}]
+      const uploadedDocs = uploadedRes.data.data; // [{documentType, fileName, status, uploadedAt, ...}]
+      // Map required docs, attach upload info if present
+      const merged = requiredDocs.map((reqDoc: any) => {
+        const uploaded = uploadedDocs.find(
+          (u: any) => u.documentType === reqDoc.type
+        );
+        return {
+          ...reqDoc,
+          status: uploaded ? uploaded.status : "not-uploaded",
+          fileName: uploaded?.fileName,
+          uploadedAt: uploaded?.uploadedAt,
+          rejectionReason: uploaded?.rejectionReason,
+          fileUrl: uploaded?.fileUrl,
+          _id: uploaded?._id,
+          notes: uploaded?.notes || [], // Merge notes
+        };
+      });
+      setDocuments(merged);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to load documents.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch required documents and user's uploaded documents
   useEffect(() => {
-    const fetchDocuments = async () => {
-      setLoading(true);
+    if (user && token) fetchAndMergeDocuments();
+    // Fetch application steps for step uploads
+    const fetchApplicationSteps = async () => {
+      if (!user?.userId) return;
       try {
-        const token = localStorage.getItem("token");
-        // 1. Fetch required document types
-        const requiredRes = await axios.get(
-          import.meta.env.VITE_BASE_URL + "/api/document/required",
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/dashboard/customer/${user.userId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        // 2. Fetch user's uploaded documents
-        const uploadedRes = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
-            user?.userId
-          }`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        // 3. Merge the two lists
-        const requiredDocs = requiredRes.data.requiredDocuments; // [{type, title, description, required}]
-        const uploadedDocs = uploadedRes.data.data; // [{documentType, fileName, status, uploadedAt, ...}]
-        // Map required docs, attach upload info if present
-        const merged = requiredDocs.map((reqDoc: any) => {
-          const uploaded = uploadedDocs.find(
-            (u: any) => u.documentType === reqDoc.type
-          );
-          return {
-            ...reqDoc,
-            status: uploaded ? uploaded.status : "not-uploaded",
-            fileName: uploaded?.fileName,
-            uploadedAt: uploaded?.uploadedAt,
-            rejectionReason: uploaded?.rejectionReason,
-            fileUrl: uploaded?.fileUrl, // <-- add this line
-            _id: uploaded?._id, // <-- add this line
-          };
-        });
-        setDocuments(merged);
+        console.log("DASHBOARD RESPONSE", res.data); // Debug log
+        // Try to get steps from res.data.application.steps or res.data.steps
+        let stepsArr = [];
+        let appId = null;
+        if (res.data.application && Array.isArray(res.data.application.steps)) {
+          stepsArr = res.data.application.steps;
+          appId = res.data.application._id;
+        } else if (Array.isArray(res.data.steps)) {
+          stepsArr = res.data.steps;
+          appId = res.data.application?._id || null;
+        }
+        setSteps(stepsArr);
+        setApplicationId(appId);
       } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to load documents.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+        setSteps([]);
+        setApplicationId(null);
       }
     };
-    if (user) fetchDocuments();
-  }, [user, toast]);
+    if (user && token) fetchApplicationSteps();
+  }, [user, token, toast]);
 
-  const handleFileUpload = async (documentType: DocumentType, file: File) => {
+  const handleFileUpload = async (
+    documentType: DocumentType,
+    file: File,
+    relatedStepName: string
+  ) => {
     setUploading(documentType);
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("documentType", documentType); // required
     formData.append("documentName", file.name); // required
-    formData.append("linkedTo", user?._id || user?.userId || ""); // required
+    formData.append("linkedTo", user?.userId || ""); // required
     formData.append("linkedModel", "Customer"); // required
+    if (applicationId && relatedStepName) {
+      formData.append("applicationId", applicationId);
+      formData.append("relatedStepName", relatedStepName);
+    }
 
     try {
-      const token = localStorage.getItem("token");
       const response = await axios.post(
         import.meta.env.VITE_BASE_URL + "/api/document/create-document",
         formData,
@@ -154,36 +195,7 @@ export const DocumentsPage: React.FC = () => {
       });
       // Refresh documents
       setUploading(null);
-      setLoading(true);
-      // Re-fetch documents
-      const requiredRes = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/required`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const uploadedRes = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
-          user?._id || user?.userId
-        }`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const requiredDocs = requiredRes.data.requiredDocuments;
-      const uploadedDocs = uploadedRes.data.data;
-      const merged = requiredDocs.map((reqDoc: any) => {
-        const uploaded = uploadedDocs.find(
-          (u: any) => u.documentType === reqDoc.type
-        );
-        return {
-          ...reqDoc,
-          status: uploaded ? uploaded.status : "not-uploaded",
-          fileName: uploaded?.fileName,
-          uploadedAt: uploaded?.uploadedAt,
-          rejectionReason: uploaded?.rejectionReason,
-          fileUrl: uploaded?.fileUrl, // <-- add this line
-          _id: uploaded?._id, // <-- add this line
-        };
-      });
-      setDocuments(merged);
-      setLoading(false);
+      fetchAndMergeDocuments();
     } catch (error: any) {
       toast({
         title: "Upload Failed",
@@ -194,11 +206,13 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
+  // Remove step validation in handleFileSelect
   const handleFileSelect = (
     documentType: DocumentType,
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
+    const step = selectedSteps[documentType];
     if (file) {
       // Validate file type and size
       const maxSize = 10 * 1024 * 1024; // 10MB
@@ -219,15 +233,46 @@ export const DocumentsPage: React.FC = () => {
         });
         return;
       }
-      handleFileUpload(documentType, file);
+      handleFileUpload(documentType, file, step);
     }
   };
 
-  const mockDownloadDocument = (fileName: string) => {
-    toast({
-      title: "Download",
-      description: `Downloading ${fileName}...`,
-    });
+  // Real download handler
+  const handleDownloadDocument = (fileUrl: string, fileName: string) => {
+    // Create a temporary link and trigger download
+    const link = document.createElement("a");
+    link.href = fileUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Add note handler for customer
+  const handleAddNote = async (docId: string) => {
+    if (!newNote.trim()) return;
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
+        { message: newNote },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Refresh documents after adding note
+      fetchAndMergeDocuments();
+      toast({
+        title: "Note Added",
+        description: "Your note has been added successfully.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to add note. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAddingNoteDocId(null);
+      setNewNote("");
+    }
   };
 
   const completedCount = documents.filter(
@@ -241,6 +286,14 @@ export const DocumentsPage: React.FC = () => {
     return (
       <div className="p-8 text-center text-lg text-muted-foreground">
         Loading documents...
+      </div>
+    );
+  }
+
+  if (documents.length === 0) {
+    return (
+      <div className="p-8 text-center text-lg text-muted-foreground">
+        No required documents found.
       </div>
     );
   }
@@ -278,6 +331,11 @@ export const DocumentsPage: React.FC = () => {
       </Card>
 
       {/* Documents List */}
+      {steps.length === 0 && (
+        <div className="p-4 text-center text-red-600">
+          No application steps found. Please complete onboarding or contact support.
+        </div>
+      )}
       <div className="grid gap-4">
         {documents.map((document) => (
           <Card key={document.type}>
@@ -296,6 +354,43 @@ export const DocumentsPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground mb-3">
                       {document.description}
                     </p>
+                    {/* Step selector for application step uploads */}
+                    {steps.length > 0 && (
+                      <select
+                        value={selectedSteps[document.type] || ""}
+                        onChange={(e) =>
+                          setSelectedSteps((prev) => ({
+                            ...prev,
+                            [document.type]: e.target.value,
+                          }))
+                        }
+                        className="mb-2 border rounded p-2"
+                      >
+                        <option value="">Select Application Step (optional)</option>
+                        {steps.map((step) => (
+                          <option key={step.stepName} value={step.stepName}>
+                            {step.stepName} ({step.status})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {/* Show notes if present */}
+                    {document.notes && document.notes.length > 0 && (
+                      <div className="mt-2 p-2 bg-yellow-50 border rounded">
+                        <strong>Notes:</strong>
+                        <ul>
+                          {document.notes.map((note: any, idx: number) => (
+                            <li key={idx}>
+                              <span className="font-semibold">{note.addedByRole === 'agent' || note.addedByRole === 'admin' ? 'Agent' : 'You'}:</span>
+                              <span> {note.message}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {note.timestamp ? new Date(note.timestamp).toLocaleString() : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {document.fileName && (
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <FileText className="h-4 w-4" />
@@ -326,16 +421,53 @@ export const DocumentsPage: React.FC = () => {
                       View
                     </Button>
                   )}
-                  {document.fileName && (
-                    <>
+                  {document.fileUrl && document.fileName && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadDocument(document.fileUrl!, document.fileName!)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {/* Add Note button for uploaded documents */}
+                  {document._id && (
+                    addingNoteDocId === document._id ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          className="border rounded p-2 text-sm"
+                          placeholder="Enter note for agent..."
+                          value={newNote}
+                          onChange={e => setNewNote(e.target.value)}
+                          rows={2}
+                          style={{ minWidth: 200 }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddNote(document._id!)}
+                            disabled={!newNote.trim()}
+                          >
+                            Add Note
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { setAddingNoteDocId(null); setNewNote(""); }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => mockDownloadDocument(document.fileName!)}
+                        onClick={() => setAddingNoteDocId(document._id!)}
                       >
-                        <Download className="h-4 w-4" />
+                        Add Note
                       </Button>
-                    </>
+                    )
                   )}
                   <div>
                     <Label

@@ -225,6 +225,24 @@ export const ApplicationsPage: React.FC = () => {
     }
   };
 
+  // Add a function to refetch the selected application from the backend
+  const refetchSelectedApplication = async () => {
+    if (!selectedApp || !selectedApp._id || !token) return;
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application/${selectedApp._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedApp = response.data.data;
+      setSelectedApp(updatedApp);
+      setApplications((prev) =>
+        prev.map((a) => (a._id === updatedApp._id ? updatedApp : a))
+      );
+    } catch (err) {
+      console.error('Error refetching application:', err);
+    }
+  };
+
   return (
     <div className="space-y-6 w-full px-4">
       <div>
@@ -352,7 +370,7 @@ export const ApplicationsPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CustomerDocuments selectedApp={selectedApp} token={token} />
+              <CustomerDocuments selectedApp={selectedApp} token={token} onApplicationRefetch={refetchSelectedApplication} />
             </CardContent>
           </Card>
 
@@ -368,6 +386,7 @@ export const ApplicationsPage: React.FC = () => {
               {applications.map((app, index) => (
                 <StepManagement
                   key={app._id ?? index}
+                  applicationId={app._id}
                   steps={app.steps}
                   status={app.status}
                   notes={app.notes}

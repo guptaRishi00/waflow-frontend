@@ -27,11 +27,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/app/store";
 import { useEffect } from "react";
 
-interface LoginFormProps {
-  onSwitchToSignup: () => void;
-}
+interface LoginFormProps {}
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
+export const LoginForm: React.FC<LoginFormProps> = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -265,15 +263,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
           </div>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{" "}
-              <button
-                onClick={onSwitchToSignup}
-                className="text-primary hover:underline font-medium"
-              >
-                Sign up
-              </button>
-            </p>
+            {/* Signup switch removed */}
           </div>
         </CardContent>
       </Card>

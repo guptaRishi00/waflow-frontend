@@ -15,6 +15,8 @@ import {
   CheckCircle,
   MessageSquare,
   DollarSign,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -38,37 +40,36 @@ export const AgentDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   console.log("form agent dashboard User:", user);
 
   // Fetch applications from backend
+  const fetchApplications = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const apps = response.data.data;
+      setApplications(apps);
+    } catch (err) {
+      console.error("Error fetching applications:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load applications.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchApplications = async () => {
-      if (!token) return;
-
-      setLoading(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/application`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        const apps = response.data.data;
-        // console.log('Fetched applications:', apps); // Log the data
-        setApplications(apps);
-      } catch (err) {
-        console.error("Error fetching applications:", err);
-        toast({
-          title: "Error",
-          description: "Failed to load applications.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchApplications();
   }, [token, toast]);
 
@@ -184,8 +185,8 @@ export const AgentDashboard: React.FC = () => {
         paymentDetails: "",
         password: "",
       });
-      // Optionally refresh applications list
-      // fetchApplications();
+      // Refresh applications list after customer creation
+      fetchApplications();
     } catch (err: any) {
       toast({
         title: "Error",
@@ -195,6 +196,31 @@ export const AgentDashboard: React.FC = () => {
       });
     } finally {
       setCreating(false);
+    }
+  };
+
+  // Update application status (Approve/Reject)
+  const handleAppStatusUpdate = async (appId: string, stepName: string, status: string) => {
+    setActionLoading(appId + status);
+    try {
+      const response = await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/step/${appId}`,
+        { stepName, status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast({
+        title: `Application ${status}`,
+        description: `Application step "${stepName}" marked as ${status}.`,
+      });
+      fetchApplications();
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: `Failed to update application status.`,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -598,32 +624,23 @@ export const AgentDashboard: React.FC = () => {
                     app.steps?.filter((step) => step.status === "Approved")
                       .length || 0;
                   const totalSteps = app.steps?.length || 0;
+                  // Find first non-approved step
+                  const currentStep = app.steps?.find((step) => step.status !== "Approved") || app.steps?.[app.steps.length - 1];
 
                   return (
                     <div
                       key={app._id}
                       className="flex items-center justify-between p-4 border rounded-lg"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <p className="font-medium">
-                            {app.customer?.firstName} {app.customer?.lastName}
-                          </p>
-                          <Badge variant="outline" className="text-xs">
-                            {app._id}
-                          </Badge>
+                      <div>
+                        <div className="font-medium">
+                          {app.customer?.firstName} {app.customer?.lastName}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {app.customer?.email} • Step {approvedSteps}/
-                          {totalSteps}
-                        </p>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                          <div
-                            className="bg-gradient-to-r from-primary to-secondary h-1.5 rounded-full"
-                            style={{
-                              width: `${(approvedSteps / totalSteps) * 100}%`,
-                            }}
-                          />
+                        <div className="text-xs text-muted-foreground">
+                          {app.customer?.email} • {app._id}
+                        </div>
+                        <div className="text-xs mt-1">
+                          {approvedSteps}/{totalSteps} steps approved
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
@@ -646,6 +663,29 @@ export const AgentDashboard: React.FC = () => {
                             View
                           </Link>
                         </Button>
+                       {/* Approve/Reject buttons for current step */}
+                       {currentStep && ["Started", "Submitted for Review", "Awaiting Response"].includes(currentStep.status) && (
+                         <>
+                           <Button
+                             size="sm"
+                             variant="default"
+                             className="flex items-center gap-1"
+                             onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Approved")}
+                             disabled={actionLoading === app._id + "Approved"}
+                           >
+                             <CheckCircle2 className="h-4 w-4" /> Approve
+                           </Button>
+                           <Button
+                             size="sm"
+                             variant="destructive"
+                             className="flex items-center gap-1"
+                             onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Declined")}
+                             disabled={actionLoading === app._id + "Declined"}
+                           >
+                             <XCircle className="h-4 w-4" /> Reject
+                           </Button>
+                         </>
+                       )}
                       </div>
                     </div>
                   );
@@ -730,26 +770,55 @@ export const AgentDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {applications.map((app) => (
-                <div
-                  key={app._id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div>
-                    <div className="font-medium">
-                      {app.customer?.firstName} {app.customer?.lastName}
+              {applications.map((app) => {
+                // Find first non-approved step
+                const currentStep = app.steps?.find((step) => step.status !== "Approved") || app.steps?.[app.steps.length - 1];
+                return (
+                  <div
+                    key={app._id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {app.customer?.firstName} {app.customer?.lastName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {app.customer?.email} • {app._id}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {app.customer?.email} • {app._id}
+                    <div className="flex items-center space-x-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/agent/applications?selected=${app._id}`}>
+                          Open
+                        </Link>
+                      </Button>
+                      {/* Approve/Reject buttons for current step */}
+                      {currentStep && ["Started", "Submitted for Review", "Awaiting Response"].includes(currentStep.status) && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="flex items-center gap-1"
+                            onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Approved")}
+                            disabled={actionLoading === app._id + "Approved"}
+                          >
+                            <CheckCircle2 className="h-4 w-4" /> Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex items-center gap-1"
+                            onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Declined")}
+                            disabled={actionLoading === app._id + "Declined"}
+                          >
+                            <XCircle className="h-4 w-4" /> Reject
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link to={`/agent/applications?selected=${app._id}`}>
-                      Open
-                    </Link>
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
