@@ -18,7 +18,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProgressTracker } from "@/components/ui/progress-tracker";
-import { FileText, MessageSquare, DollarSign, Eye, Edit } from "lucide-react";
+import {
+  FileText,
+  MessageSquare,
+  DollarSign,
+  Eye,
+  Edit,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 // import { mockApplications } from '@/lib/mock-data';
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +38,7 @@ import axios from "axios";
 import ApplicationCard from "./ApplicationCard";
 import StepManagement from "./StepManagement";
 import CustomerDocuments from "./CustomerDocuments";
+import VisaApplicationsList from "./VisaApplicationsList";
 
 export const ApplicationsPage: React.FC = () => {
   const [applications, setApplications] = useState<any[]>([]);
@@ -44,6 +53,8 @@ export const ApplicationsPage: React.FC = () => {
   const [stepActionLoading, setStepActionLoading] = useState(false);
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
   const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
+  const [visaApplications, setVisaApplications] = useState<any[]>([]);
+  const [visaLoading, setVisaLoading] = useState(false);
 
   const [demo, setDemo] = useState(null);
 
@@ -162,6 +173,26 @@ export const ApplicationsPage: React.FC = () => {
     fetchDocuments();
   }, [selectedApp, token]);
 
+  // Fetch visa applications
+  useEffect(() => {
+    const fetchVisaApps = async () => {
+      if (!token) return;
+      setVisaLoading(true);
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setVisaApplications(res.data.data || []);
+      } catch (err) {
+        setVisaApplications([]);
+      } finally {
+        setVisaLoading(false);
+      }
+    };
+    fetchVisaApps();
+  }, [token]);
+
   const handleUpdateStep = () => {
     toast({
       title: "Step Updated",
@@ -239,7 +270,32 @@ export const ApplicationsPage: React.FC = () => {
         prev.map((a) => (a._id === updatedApp._id ? updatedApp : a))
       );
     } catch (err) {
-      console.error('Error refetching application:', err);
+      console.error("Error refetching application:", err);
+    }
+  };
+
+  // Approve/Reject handler for visa applications
+  const handleVisaStatusUpdate = async (id: string, status: string) => {
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/visa/${id}/approve`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setVisaApplications((prev) =>
+        prev.map((v) => (v._id === id ? { ...v, status } : v))
+      );
+      toast({
+        title: `Visa ${status}`,
+        description: `Visa application marked as ${status}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description:
+          err?.response?.data?.message || "Failed to update visa status.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -336,28 +392,26 @@ export const ApplicationsPage: React.FC = () => {
           </Card>
 
           {/* Progress Tracker */}
+          {/* Visa Section replacing Application Steps */}
           <Card>
             <CardHeader>
-              <CardTitle>Application Steps</CardTitle>
+              <CardTitle>Visa Applications</CardTitle>
               <CardDescription>
-                Track and update application steps
+                Review, preview, and manage visa applications for this customer.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ProgressTracker
-                steps={selectedApp?.steps || []}
-                currentStep={
-                  selectedApp?.steps?.filter(
-                    (step) => step.status === "Approved"
-                  ).length || 0
-                }
-                onStepAction={handleStepAction}
+              <VisaApplicationsList
+                visaApplications={visaApplications.filter(
+                  (visa) =>
+                    visa.customer &&
+                    selectedApp &&
+                    selectedApp.customer &&
+                    visa.customer._id === selectedApp.customer._id
+                )}
+                loading={visaLoading}
+                onStatusUpdate={handleVisaStatusUpdate}
               />
-              {stepActionLoading && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Updating step...
-                </p>
-              )}
             </CardContent>
           </Card>
 
@@ -370,7 +424,20 @@ export const ApplicationsPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CustomerDocuments selectedApp={selectedApp} token={token} onApplicationRefetch={refetchSelectedApplication} />
+              <CustomerDocuments
+                selectedApp={selectedApp}
+                token={token}
+                onApplicationRefetch={refetchSelectedApplication}
+                visaDocuments={visaApplications
+                  .filter(
+                    (visa) =>
+                      visa.customer &&
+                      selectedApp &&
+                      selectedApp.customer &&
+                      visa.customer._id === selectedApp.customer._id
+                  )
+                  .flatMap((visa) => visa.documents)}
+              />
             </CardContent>
           </Card>
 
@@ -383,20 +450,19 @@ export const ApplicationsPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {applications.map((app, index) => (
+              {selectedApp && (
                 <StepManagement
-                  key={app._id ?? index}
-                  applicationId={app._id}
-                  steps={app.steps}
-                  status={app.status}
-                  notes={app.notes}
+                  applicationId={selectedApp._id}
+                  steps={selectedApp.steps}
+                  status={selectedApp.status}
+                  notes={selectedApp.notes}
                   stepStatus={stepStatus}
                   setStepStatus={setStepStatus}
                   agentNotes={agentNotes}
                   setAgentNotes={setAgentNotes}
                   handleUpdateStep={handleUpdateStep}
                 />
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>

@@ -17,6 +17,7 @@ import {
   DollarSign,
   CheckCircle2,
   XCircle,
+  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -34,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import VisaApplicationsList from "./VisaApplicationsList";
 
 export const AgentDashboard: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -42,7 +44,8 @@ export const AgentDashboard: React.FC = () => {
   const { toast } = useToast();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  console.log("form agent dashboard User:", user);
+  const [visaApplications, setVisaApplications] = useState<any[]>([]);
+  const [visaLoading, setVisaLoading] = useState(false);
 
   // Fetch applications from backend
   const fetchApplications = async () => {
@@ -72,6 +75,26 @@ export const AgentDashboard: React.FC = () => {
   useEffect(() => {
     fetchApplications();
   }, [token, toast]);
+
+  // Fetch all submitted visa applications
+  useEffect(() => {
+    const fetchVisaApps = async () => {
+      if (!token) return;
+      setVisaLoading(true);
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setVisaApplications(res.data.data || []);
+      } catch (err) {
+        setVisaApplications([]);
+      } finally {
+        setVisaLoading(false);
+      }
+    };
+    fetchVisaApps();
+  }, [token]);
 
   // Modal state and form fields for creating a customer
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -200,7 +223,11 @@ export const AgentDashboard: React.FC = () => {
   };
 
   // Update application status (Approve/Reject)
-  const handleAppStatusUpdate = async (appId: string, stepName: string, status: string) => {
+  const handleAppStatusUpdate = async (
+    appId: string,
+    stepName: string,
+    status: string
+  ) => {
     setActionLoading(appId + status);
     try {
       const response = await axios.patch(
@@ -221,6 +248,30 @@ export const AgentDashboard: React.FC = () => {
       });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleVisaStatusUpdate = async (id: string, status: string) => {
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/visa/${id}/approve`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast({
+        title: `Visa ${status}`,
+        description: `Visa application marked as ${status}.`,
+      });
+      setVisaApplications((prev) =>
+        prev.map((v) => (v._id === id ? { ...v, status } : v))
+      );
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description:
+          err?.response?.data?.message || "Failed to update visa status.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -248,19 +299,43 @@ export const AgentDashboard: React.FC = () => {
     )
     .slice(0, 3); // Show only first 3 active applications
 
+  // Helper: filter applications with submitted or in-progress visa substeps
+  const visaRelevantStatuses = [
+    "Started",
+    "Submitted for Review",
+    "Awaiting Response",
+    "Approved",
+  ];
+  const submittedVisaApps = applications.filter(
+    (app) =>
+      Array.isArray(app.visaSubSteps) &&
+      app.visaSubSteps.some((member) =>
+        ["medical", "residenceVisa", "emiratesIdSoft", "emiratesIdHard"].some(
+          (key) =>
+            member[key] && visaRelevantStatuses.includes(member[key].status)
+        )
+      )
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-10 w-full px-4 bg-gray-50 min-h-screen pb-10">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-primary">Agent Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-4xl font-extrabold text-primary mb-1">
+            Agent Dashboard
+          </h1>
+          <p className="text-lg text-muted-foreground">
             Manage your client applications and track progress
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="h-10">
+        <Button
+          onClick={() => setShowCreateModal(true)}
+          className="h-12 px-6 text-lg font-semibold rounded-lg shadow bg-primary hover:bg-primary/90"
+        >
           + Create Customer
         </Button>
       </div>
+
       {/* Create Customer Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
@@ -271,7 +346,7 @@ export const AgentDashboard: React.FC = () => {
             onSubmit={handleCreateCustomer}
             className="space-y-3 max-h-[70vh] overflow-y-auto"
           >
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
@@ -525,178 +600,230 @@ export const AgentDashboard: React.FC = () => {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={creating}>
+              <Button
+                type="submit"
+                disabled={creating}
+                className="font-semibold"
+              >
                 {creating ? "Creating..." : "Create Customer"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Clients</p>
-                <p className="text-2xl font-bold">{stats.totalClients}</p>
-              </div>
-              <Users className="h-8 w-8 text-primary" />
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
+        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-lg text-muted-foreground">Total Clients</p>
+              <p className="text-3xl font-bold">{stats.totalClients}</p>
             </div>
+            <Users className="h-10 w-10 text-primary" />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Apps</p>
-                <p className="text-2xl font-bold">{stats.activeApplications}</p>
-              </div>
-              <FileText className="h-8 w-8 text-secondary" />
+        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-lg text-muted-foreground">Active Apps</p>
+              <p className="text-3xl font-bold">{stats.activeApplications}</p>
             </div>
+            <FileText className="h-10 w-10 text-secondary" />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">
-                  {stats.completedApplications}
-                </p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-lg text-muted-foreground">Completed</p>
+              <p className="text-3xl font-bold">
+                {stats.completedApplications}
+              </p>
             </div>
+            <CheckCircle className="h-10 w-10 text-green-600" />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pending Tasks</p>
-                <p className="text-2xl font-bold">{stats.pendingTasks}</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-lg text-muted-foreground">Pending Tasks</p>
+              <p className="text-3xl font-bold">{stats.pendingTasks}</p>
             </div>
+            <Clock className="h-10 w-10 text-orange-600" />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Revenue (AED)</p>
-                <p className="text-2xl font-bold">
-                  {stats.monthlyRevenue.toLocaleString()}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
+        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-lg text-muted-foreground">Revenue (AED)</p>
+              <p className="text-3xl font-bold">
+                {stats.monthlyRevenue.toLocaleString()}
+              </p>
             </div>
+            <DollarSign className="h-10 w-10 text-green-600" />
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Active Applications */}
-        <Card>
+      <hr className="my-8 border-gray-200" />
+
+      {/* Visa Applications Section */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <Badge className="bg-blue-100 text-blue-800">Visa</Badge> Visa
+          Applications
+        </h2>
+        <Card className="shadow-lg rounded-xl">
           <CardHeader>
-            <CardTitle>Active Applications</CardTitle>
+            <CardTitle className="text-xl font-semibold">
+              All Submitted Visa Applications
+            </CardTitle>
             <CardDescription>
-              Applications requiring your attention
+              Review, preview, and manage all submitted visa applications.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Loading applications...
-              </div>
-            ) : activeApplications.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No active applications found
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeApplications.map((app) => {
-                  const approvedSteps =
-                    app.steps?.filter((step) => step.status === "Approved")
-                      .length || 0;
-                  const totalSteps = app.steps?.length || 0;
-                  // Find first non-approved step
-                  const currentStep = app.steps?.find((step) => step.status !== "Approved") || app.steps?.[app.steps.length - 1];
-
-                  return (
-                    <div
-                      key={app._id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div>
-                        <div className="font-medium">
-                          {app.customer?.firstName} {app.customer?.lastName}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {app.customer?.email} • {app._id}
-                        </div>
-                        <div className="text-xs mt-1">
-                          {approvedSteps}/{totalSteps} steps approved
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <Badge
-                          variant={
-                            app.status === "In Progress"
-                              ? "secondary"
-                              : "default"
-                          }
-                          className={
-                            app.status === "In Progress"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : ""
-                          }
-                        >
-                          {app.status}
-                        </Badge>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link to={`/agent/applications?selected=${app._id}`}>
-                            View
-                          </Link>
-                        </Button>
-                       {/* Approve/Reject buttons for current step */}
-                       {currentStep && ["Started", "Submitted for Review", "Awaiting Response"].includes(currentStep.status) && (
-                         <>
-                           <Button
-                             size="sm"
-                             variant="default"
-                             className="flex items-center gap-1"
-                             onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Approved")}
-                             disabled={actionLoading === app._id + "Approved"}
-                           >
-                             <CheckCircle2 className="h-4 w-4" /> Approve
-                           </Button>
-                           <Button
-                             size="sm"
-                             variant="destructive"
-                             className="flex items-center gap-1"
-                             onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Declined")}
-                             disabled={actionLoading === app._id + "Declined"}
-                           >
-                             <XCircle className="h-4 w-4" /> Reject
-                           </Button>
-                         </>
-                       )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <CardContent className="relative z-0">
+            <VisaApplicationsList
+              key={visaApplications.length}
+              visaApplications={visaApplications}
+              loading={visaLoading}
+              onStatusUpdate={handleVisaStatusUpdate}
+            />
           </CardContent>
         </Card>
+      </div>
 
+      <hr className="my-8 border-gray-200" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Active Applications */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <Badge className="bg-yellow-100 text-yellow-800">Active</Badge>{" "}
+            Active Applications
+          </h2>
+          <Card className="shadow-lg rounded-xl">
+            <CardHeader>
+              <CardTitle>Active Applications</CardTitle>
+              <CardDescription>
+                Applications requiring your attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Loading applications...
+                </div>
+              ) : activeApplications.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <span className="text-5xl">🗂️</span>
+                  <div>No active applications found</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeApplications.map((app) => {
+                    const approvedSteps =
+                      app.steps?.filter((step) => step.status === "Approved")
+                        .length || 0;
+                    const totalSteps = app.steps?.length || 0;
+                    // Find first non-approved step
+                    const currentStep =
+                      app.steps?.find((step) => step.status !== "Approved") ||
+                      app.steps?.[app.steps.length - 1];
+
+                    return (
+                      <div
+                        key={app._id}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-white hover:shadow-md transition-shadow"
+                      >
+                        <div>
+                          <div className="font-medium">
+                            {app.customer?.firstName} {app.customer?.lastName}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {app.customer?.email} • {app._id}
+                          </div>
+                          <div className="text-xs mt-1">
+                            {approvedSteps}/{totalSteps} steps approved
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <Badge
+                            variant={
+                              app.status === "In Progress"
+                                ? "secondary"
+                                : "default"
+                            }
+                            className={
+                              app.status === "In Progress"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : ""
+                            }
+                          >
+                            {app.status}
+                          </Badge>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              to={`/agent/applications?selected=${app._id}`}
+                            >
+                              View
+                            </Link>
+                          </Button>
+                          {/* Approve/Reject buttons for current step */}
+                          {currentStep &&
+                            [
+                              "Started",
+                              "Submitted for Review",
+                              "Awaiting Response",
+                            ].includes(currentStep.status) && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="flex items-center gap-1"
+                                  onClick={() =>
+                                    handleAppStatusUpdate(
+                                      app._id,
+                                      currentStep.stepName,
+                                      "Approved"
+                                    )
+                                  }
+                                  disabled={
+                                    actionLoading === app._id + "Approved"
+                                  }
+                                >
+                                  <CheckCircle2 className="h-4 w-4" /> Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="flex items-center gap-1"
+                                  onClick={() =>
+                                    handleAppStatusUpdate(
+                                      app._id,
+                                      currentStep.stepName,
+                                      "Declined"
+                                    )
+                                  }
+                                  disabled={
+                                    actionLoading === app._id + "Declined"
+                                  }
+                                >
+                                  <XCircle className="h-4 w-4" /> Reject
+                                </Button>
+                              </>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
         {/* Recent Activity */}
-        <Card>
+        <Card className="shadow-lg rounded-xl">
           <CardHeader>
             <CardTitle>Today's Tasks</CardTitle>
             <CardDescription>Your priority tasks for today</CardDescription>
@@ -751,8 +878,10 @@ export const AgentDashboard: React.FC = () => {
         </Card>
       </div>
 
+      <hr className="my-8 border-gray-200" />
+
       {/* All Applications List */}
-      <Card className="mt-6">
+      <Card className="mt-10 shadow-lg rounded-xl">
         <CardHeader>
           <CardTitle>All Applications</CardTitle>
           <CardDescription>
@@ -761,18 +890,20 @@ export const AgentDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground">
               Loading applications...
             </div>
           ) : applications.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground">
               No applications found
             </div>
           ) : (
             <div className="space-y-2">
               {applications.map((app) => {
                 // Find first non-approved step
-                const currentStep = app.steps?.find((step) => step.status !== "Approved") || app.steps?.[app.steps.length - 1];
+                const currentStep =
+                  app.steps?.find((step) => step.status !== "Approved") ||
+                  app.steps?.[app.steps.length - 1];
                 return (
                   <div
                     key={app._id}
@@ -793,28 +924,45 @@ export const AgentDashboard: React.FC = () => {
                         </Link>
                       </Button>
                       {/* Approve/Reject buttons for current step */}
-                      {currentStep && ["Started", "Submitted for Review", "Awaiting Response"].includes(currentStep.status) && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="flex items-center gap-1"
-                            onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Approved")}
-                            disabled={actionLoading === app._id + "Approved"}
-                          >
-                            <CheckCircle2 className="h-4 w-4" /> Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="flex items-center gap-1"
-                            onClick={() => handleAppStatusUpdate(app._id, currentStep.stepName, "Declined")}
-                            disabled={actionLoading === app._id + "Declined"}
-                          >
-                            <XCircle className="h-4 w-4" /> Reject
-                          </Button>
-                        </>
-                      )}
+                      {currentStep &&
+                        [
+                          "Started",
+                          "Submitted for Review",
+                          "Awaiting Response",
+                        ].includes(currentStep.status) && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="flex items-center gap-1"
+                              onClick={() =>
+                                handleAppStatusUpdate(
+                                  app._id,
+                                  currentStep.stepName,
+                                  "Approved"
+                                )
+                              }
+                              disabled={actionLoading === app._id + "Approved"}
+                            >
+                              <CheckCircle2 className="h-4 w-4" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="flex items-center gap-1"
+                              onClick={() =>
+                                handleAppStatusUpdate(
+                                  app._id,
+                                  currentStep.stepName,
+                                  "Declined"
+                                )
+                              }
+                              disabled={actionLoading === app._id + "Declined"}
+                            >
+                              <XCircle className="h-4 w-4" /> Reject
+                            </Button>
+                          </>
+                        )}
                     </div>
                   </div>
                 );
@@ -825,7 +973,7 @@ export const AgentDashboard: React.FC = () => {
       </Card>
 
       {/* Quick Actions */}
-      <Card>
+      <Card className="mt-10 shadow-lg rounded-xl">
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
           <CardDescription>Common tasks and shortcuts</CardDescription>
