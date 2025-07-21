@@ -18,6 +18,7 @@ import {
   XCircle,
   Eye,
   Download,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DocumentType } from "@/types";
@@ -28,6 +29,11 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Document as PDFDocument, Page as PDFPage } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import StepsCarousel from "./components/StepsCarousel";
+import DocumentUploadSection from "./components/DocumentUploadSection";
+import AddNote from "./components/AddNote";
+// import StepsCarousel from "./components/StepsCarousel";
+// import StepsCarousel from "./components/StepsCarousel";
 
 interface DocumentItem {
   type: DocumentType;
@@ -69,17 +75,144 @@ const getStatusBadge = (status: DocumentItem["status"]) => {
 
 export const DocumentsPage: React.FC = () => {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [uploading, setUploading] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, token } = useSelector((state: RootState) => state.customerAuth);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
-  const [steps, setSteps] = useState<{ stepName: string; status: string }[]>([]);
-  const [selectedStep, setSelectedStep] = useState<string>("");
-  const [selectedSteps, setSelectedSteps] = useState<{ [docType: string]: string }>({});
-  const [addingNoteDocId, setAddingNoteDocId] = useState<string | null>(null);
-  const [newNote, setNewNote] = useState<string>("");
+  const [steps, setSteps] = useState<{ stepName: string; status: string }[]>(
+    []
+  );
+
+  const [selectedStep, setSelectedStep] = useState("KYC & Background Check");
+  const stepsWithDocuments = {
+    "KYC & Background Check": [
+      {
+        id: "passport",
+        label: "KYC & Background Check - Document",
+        description: "Valid passport with at least 6 months validity",
+      },
+    ],
+    "Business Activity Selection": [
+      {
+        id: "document",
+        label: "Business Activity Selection - Document",
+        description: "Recent trade license copy",
+      },
+    ],
+    "Trade Name Reservation": [
+      {
+        id: "document",
+        label: "Trade Name Reservation - Document",
+        description: "Initial approval receipt",
+      },
+    ],
+    "Legal Structure Confirmation": [
+      {
+        id: "document",
+        label: "Legal Structure Confirmation - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Initial Approval / Pre-Approval": [
+      {
+        id: "document",
+        label: "Initial Approval / Pre-Approval - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "MoA Drafting & Signature": [
+      {
+        id: "document",
+        label: "MoA Drafting & Signature - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Office Lease / Flexi Desk": [
+      {
+        id: "document",
+        label: "Office Lease / Flexi Desk - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Payment & License Issuance": [
+      {
+        id: "document",
+        label: "Payment & License Issuance - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Establishment Card": [
+      {
+        id: "document",
+        label: "Establishment Card - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Visa Allocation Request": [
+      {
+        id: "document",
+        label: "Visa Allocation Request - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Visa Application": [
+      {
+        id: "document",
+        label: "Visa Application - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Medical & Emirates ID": [
+      {
+        id: "document",
+        label: "Medical & Emirates ID - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Corporate Tax Registration": [
+      {
+        id: "document",
+        label: "Corporate Tax Registration - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "VAT Registration": [
+      {
+        id: "document",
+        label: "VAT Registration - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Bank Account Setup": [
+      {
+        id: "document",
+        label: "Bank Account Setup - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+    "Chamber of Commerce Registration": [
+      {
+        id: "document",
+        label: "Chamber of Commerce Registration - Document",
+        description: "Legal Structure Confirmation",
+      },
+    ],
+  };
+
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    [key: string]: File | null;
+  }>({});
+
+  const [stepDocuments, setStepDocuments] = useState<any[]>([]); // Holds uploaded docs for the current step
+
+  const handleFileChange = (stepName: string, file: File | null) => {
+    setUploadedFiles((prev) => ({
+      ...prev,
+      [stepName]: file,
+    }));
+  };
 
   // Helper to fetch and merge required/uploaded documents
   const fetchAndMergeDocuments = async () => {
@@ -92,12 +225,14 @@ export const DocumentsPage: React.FC = () => {
       );
       // 2. Fetch user's uploaded documents
       const uploadedRes = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${user?.userId}`,
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+          user?.userId
+        }`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       // 3. Merge the two lists
-      const requiredDocs = requiredRes.data.requiredDocuments; // [{type, title, description, required}]
-      const uploadedDocs = uploadedRes.data.data; // [{documentType, fileName, status, uploadedAt, ...}]
+      const requiredDocs = requiredRes.data.requiredDocuments;
+      const uploadedDocs = uploadedRes.data.data;
       // Map required docs, attach upload info if present
       const merged = requiredDocs.map((reqDoc: any) => {
         const uploaded = uploadedDocs.find(
@@ -126,6 +261,28 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
+  // Fetch uploaded document for the current step
+  const fetchStepDocuments = async (stepName: string) => {
+    setLoading(true);
+    try {
+      if (!user?.userId || !token) return;
+      // Fetch uploaded documents for this user
+      const uploadedRes = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${user.userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Find document(s) for this step
+      const docsForStep = uploadedRes.data.data.filter(
+        (doc: any) => doc.relatedStepName === stepName
+      );
+      setStepDocuments(docsForStep);
+    } catch (err) {
+      setStepDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch required documents and user's uploaded documents
   useEffect(() => {
     if (user && token) fetchAndMergeDocuments();
@@ -134,11 +291,12 @@ export const DocumentsPage: React.FC = () => {
       if (!user?.userId) return;
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/dashboard/customer/${user.userId}`,
+          `${import.meta.env.VITE_BASE_URL}/api/dashboard/customer/${
+            user.userId
+          }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("DASHBOARD RESPONSE", res.data); // Debug log
-        // Try to get steps from res.data.application.steps or res.data.steps
+
         let stepsArr = [];
         let appId = null;
         if (res.data.application && Array.isArray(res.data.application.steps)) {
@@ -158,122 +316,14 @@ export const DocumentsPage: React.FC = () => {
     if (user && token) fetchApplicationSteps();
   }, [user, token, toast]);
 
-  const handleFileUpload = async (
-    documentType: DocumentType,
-    file: File,
-    relatedStepName: string
-  ) => {
-    setUploading(documentType);
+  console.log("Application Id:", applicationId);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("documentType", documentType); // required
-    formData.append("documentName", file.name); // required
-    formData.append("linkedTo", user?.userId || ""); // required
-    formData.append("linkedModel", "Customer"); // required
-    if (applicationId && relatedStepName) {
-      formData.append("applicationId", applicationId);
-      formData.append("relatedStepName", relatedStepName);
+  // Fetch on mount and when selectedStep changes
+  useEffect(() => {
+    if (user && token && selectedStep) {
+      fetchStepDocuments(selectedStep);
     }
-
-    try {
-      const response = await axios.post(
-        import.meta.env.VITE_BASE_URL + "/api/document/create-document",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      // After upload, refresh the document list
-      toast({
-        title: "Document Uploaded",
-        description: `${file.name} has been uploaded successfully.`,
-      });
-      // Refresh documents
-      setUploading(null);
-      fetchAndMergeDocuments();
-    } catch (error: any) {
-      toast({
-        title: "Upload Failed",
-        description: error?.response?.data?.message || "An error occurred.",
-        variant: "destructive",
-      });
-      setUploading(null);
-    }
-  };
-
-  // Remove step validation in handleFileSelect
-  const handleFileSelect = (
-    documentType: DocumentType,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    const step = selectedSteps[documentType];
-    if (file) {
-      // Validate file type and size
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload PDF, JPEG, or PNG files only.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (file.size > maxSize) {
-        toast({
-          title: "File Too Large",
-          description: "Please upload files smaller than 10MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-      handleFileUpload(documentType, file, step);
-    }
-  };
-
-  // Real download handler
-  const handleDownloadDocument = (fileUrl: string, fileName: string) => {
-    // Create a temporary link and trigger download
-    const link = document.createElement("a");
-    link.href = fileUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Add note handler for customer
-  const handleAddNote = async (docId: string) => {
-    if (!newNote.trim()) return;
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
-        { message: newNote },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Refresh documents after adding note
-      fetchAndMergeDocuments();
-      toast({
-        title: "Note Added",
-        description: "Your note has been added successfully.",
-      });
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to add note. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setAddingNoteDocId(null);
-      setNewNote("");
-    }
-  };
+  }, [user, token, selectedStep]);
 
   const completedCount = documents.filter(
     (doc) => doc.status === "verified"
@@ -307,199 +357,65 @@ export const DocumentsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Progress Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Progress</CardTitle>
-          <CardDescription>
-            {completedCount} of {documents.length} documents verified
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-            <div
-              className="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all duration-500"
-              style={{ width: `${(completedCount / documents.length) * 100}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>{uploadedCount} uploaded</span>
-            <span>{completedCount} verified</span>
-            <span>{documents.length - uploadedCount} remaining</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Carousel Section */}
+      <div className="w-full mx-auto p-2 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Application Steps
+            </CardTitle>
+            <CardDescription>
+              {completedCount} of {documents.length} documents verified
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-green-600 h-2 rounded-full transition-all duration-300"></div>
+            </div>
 
-      {/* Documents List */}
-      {steps.length === 0 && (
-        <div className="p-4 text-center text-red-600">
-          No application steps found. Please complete onboarding or contact support.
-        </div>
-      )}
-      <div className="grid gap-4">
-        {documents.map((document) => (
-          <Card key={document.type}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="mt-1">{getStatusIcon(document.status)}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-semibold">{document.title}</h3>
-                      {document.required && (
-                        <span className="text-red-500 text-sm">*</span>
-                      )}
-                      {getStatusBadge(document.status)}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {document.description}
-                    </p>
-                    {/* Step selector for application step uploads */}
-                    {steps.length > 0 && (
-                      <select
-                        value={selectedSteps[document.type] || ""}
-                        onChange={(e) =>
-                          setSelectedSteps((prev) => ({
-                            ...prev,
-                            [document.type]: e.target.value,
-                          }))
-                        }
-                        className="mb-2 border rounded p-2"
-                      >
-                        <option value="">Select Application Step (optional)</option>
-                        {steps.map((step) => (
-                          <option key={step.stepName} value={step.stepName}>
-                            {step.stepName} ({step.status})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {/* Show notes if present */}
-                    {document.notes && document.notes.length > 0 && (
-                      <div className="mt-2 p-2 bg-yellow-50 border rounded">
-                        <strong>Notes:</strong>
-                        <ul>
-                          {document.notes.map((note: any, idx: number) => (
-                            <li key={idx}>
-                              <span className="font-semibold">{note.addedByRole === 'agent' || note.addedByRole === 'admin' ? 'Agent' : 'You'}:</span>
-                              <span> {note.message}</span>
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {note.timestamp ? new Date(note.timestamp).toLocaleString() : ""}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {document.fileName && (
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <FileText className="h-4 w-4" />
-                        <span>{document.fileName}</span>
-                        <span>•</span>
-                        <span>
-                          Uploaded{" "}
-                          {new Date(document.uploadedAt!).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {document.rejectionReason && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                        <strong>Rejection Reason:</strong>{" "}
-                        {document.rejectionReason}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {document.fileUrl && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPreviewUrl(document.fileUrl!)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      View
-                    </Button>
-                  )}
-                  {document.fileUrl && document.fileName && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadDocument(document.fileUrl!, document.fileName!)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {/* Add Note button for uploaded documents */}
-                  {document._id && (
-                    addingNoteDocId === document._id ? (
-                      <div className="flex flex-col gap-2">
-                        <textarea
-                          className="border rounded p-2 text-sm"
-                          placeholder="Enter note for agent..."
-                          value={newNote}
-                          onChange={e => setNewNote(e.target.value)}
-                          rows={2}
-                          style={{ minWidth: 200 }}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddNote(document._id!)}
-                            disabled={!newNote.trim()}
-                          >
-                            Add Note
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => { setAddingNoteDocId(null); setNewNote(""); }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAddingNoteDocId(document._id!)}
-                      >
-                        Add Note
-                      </Button>
-                    )
-                  )}
-                  <div>
-                    <Label
-                      htmlFor={`file-${document.type}`}
-                      className={`cursor-pointer inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        uploading === document.type
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-primary text-primary-foreground hover:bg-primary/90"
-                      }`}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploading === document.type
-                        ? "Uploading..."
-                        : document.fileName
-                        ? "Replace"
-                        : "Upload"}
-                    </Label>
-                    <Input
-                      id={`file-${document.type}`}
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileSelect(document.type, e)}
-                      disabled={uploading === document.type}
-                    />
-                  </div>
+            {/* Steps carousel */}
+            <StepsCarousel
+              onStepSelect={setSelectedStep}
+              selectedStepName={selectedStep}
+            />
+
+            {/* Status summary */}
+            <div className="flex justify-between items-center text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span>{completedCount} verified</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Upload className="w-4 h-4 text-blue-600" />
+                  <span>{uploadedCount} uploaded</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span>10 remaining</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <DocumentUploadSection
+        documents={stepsWithDocuments[selectedStep] || []}
+        uploadedFiles={uploadedFiles}
+        onFileChange={handleFileChange}
+        onUploadSuccess={() => fetchStepDocuments(selectedStep)}
+        uploadedDocs={stepDocuments}
+        stepName={selectedStep}
+      />
+
+      <AddNote />
 
       {/* Help Text */}
       <Card>
