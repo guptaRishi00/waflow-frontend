@@ -39,6 +39,7 @@ import { ManagerApplicationsPage } from "./pages/manager/ManagerApplicationsPage
 import { ManagerCustomersPage } from "./pages/manager/ManagerCustomersPage";
 import { ManagerSettings } from "./pages/manager/ManagerSettings";
 import { AuthInitializer } from "./lib/AuthInitializer";
+import ApplicationPage from "./pages/customer/ApplicationPage";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,7 @@ const AppRoutes = () => {
                 <Route path="chat" element={<ChatPage />} />
                 <Route path="settings" element={<CustomerSettings />} />
                 <Route path="basic-info" element={<BasicInfoPage />} />
+                <Route path="application" element={<ApplicationPage />} />
                 <Route
                   path="*"
                   element={<Navigate to="/customer/dashboard" replace />}

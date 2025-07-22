@@ -10,6 +10,7 @@ import {
   Home,
   FolderOpen,
   User,
+  AppWindowMac,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,9 +35,9 @@ const customerNavItems = [
   { title: "Dashboard", url: "/customer/dashboard", icon: LayoutDashboard },
   { title: "Basic Info", url: "/customer/basic-info", icon: User },
   { title: "Documents", url: "/customer/documents", icon: FileText },
-  { title: "Digilocker", url: "/customer/digilocker", icon: FolderOpen },
+  { title: "Application", url: "/customer/application", icon: AppWindowMac },
   { title: "Visa Application", url: "/customer/visa", icon: CreditCard },
-  { title: "Chat", url: "/customer/chat", icon: MessageSquare },
+  // { title: "Chat", url: "/customer/chat", icon: MessageSquare },
   { title: "Settings", url: "/customer/settings", icon: Settings },
 ];
 
