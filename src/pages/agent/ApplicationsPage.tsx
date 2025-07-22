@@ -53,8 +53,7 @@ export const ApplicationsPage: React.FC = () => {
   const [stepActionLoading, setStepActionLoading] = useState(false);
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
   const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
-  const [visaApplications, setVisaApplications] = useState<any[]>([]);
-  const [visaLoading, setVisaLoading] = useState(false);
+  // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
 
   const [demo, setDemo] = useState(null);
 
@@ -173,25 +172,7 @@ export const ApplicationsPage: React.FC = () => {
     fetchDocuments();
   }, [selectedApp, token]);
 
-  // Fetch visa applications
-  useEffect(() => {
-    const fetchVisaApps = async () => {
-      if (!token) return;
-      setVisaLoading(true);
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setVisaApplications(res.data.data || []);
-      } catch (err) {
-        setVisaApplications([]);
-      } finally {
-        setVisaLoading(false);
-      }
-    };
-    fetchVisaApps();
-  }, [token]);
+  // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
 
   const handleUpdateStep = () => {
     toast({
@@ -274,30 +255,7 @@ export const ApplicationsPage: React.FC = () => {
     }
   };
 
-  // Approve/Reject handler for visa applications
-  const handleVisaStatusUpdate = async (id: string, status: string) => {
-    try {
-      await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/visa/${id}/approve`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setVisaApplications((prev) =>
-        prev.map((v) => (v._id === id ? { ...v, status } : v))
-      );
-      toast({
-        title: `Visa ${status}`,
-        description: `Visa application marked as ${status}.`,
-      });
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description:
-          err?.response?.data?.message || "Failed to update visa status.",
-        variant: "destructive",
-      });
-    }
-  };
+  // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
 
   return (
     <div className="space-y-6 w-full px-4">
@@ -393,27 +351,7 @@ export const ApplicationsPage: React.FC = () => {
 
           {/* Progress Tracker */}
           {/* Visa Section replacing Application Steps */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Visa Applications</CardTitle>
-              <CardDescription>
-                Review, preview, and manage visa applications for this customer.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VisaApplicationsList
-                visaApplications={visaApplications.filter(
-                  (visa) =>
-                    visa.customer &&
-                    selectedApp &&
-                    selectedApp.customer &&
-                    visa.customer._id === selectedApp.customer._id
-                )}
-                loading={visaLoading}
-                onStatusUpdate={handleVisaStatusUpdate}
-              />
-            </CardContent>
-          </Card>
+          {/* Remove the Card with VisaApplicationsList from the render */}
 
           {/* Customer Documents */}
           <Card>
@@ -428,15 +366,7 @@ export const ApplicationsPage: React.FC = () => {
                 selectedApp={selectedApp}
                 token={token}
                 onApplicationRefetch={refetchSelectedApplication}
-                visaDocuments={visaApplications
-                  .filter(
-                    (visa) =>
-                      visa.customer &&
-                      selectedApp &&
-                      selectedApp.customer &&
-                      visa.customer._id === selectedApp.customer._id
-                  )
-                  .flatMap((visa) => visa.documents)}
+                visaDocuments={[]} // No longer fetching visa documents here
               />
             </CardContent>
           </Card>

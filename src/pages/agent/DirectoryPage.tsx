@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,63 +21,169 @@ import {
 import { DocumentUploadModal } from "@/components/common/DocumentUploadModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import axios from "axios";
+import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { mockUsers } from "@/lib/mock-data";
 
-interface DocumentItem {
-  id: string;
-  customerName: string;
-  applicationId: string;
-  fileName: string;
-  category: "passport" | "photo" | "visa" | "invoice" | "government" | "other";
-  uploadedAt: string;
-  status: "uploaded" | "verified" | "rejected";
-  fileUrl: string;
-  fileType: string;
-  customerId?: string;
-  description?: string;
+interface Customer {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  companyType?: string;
+  createdAt: string;
+  assignedAgentId?: string;
 }
 
-const mockDocuments: DocumentItem[] = [
+interface DocumentApiItem {
+  _id: string;
+  documentType: string;
+  documentName: string;
+  fileUrl: string;
+  status: string;
+  uploadedAt: string;
+  notes?: { message: string; addedByRole?: string; timestamp: string }[];
+}
+
+const mockDocuments: DocumentApiItem[] = [
   {
-    id: "1",
-    customerName: "John Doe",
-    applicationId: "APP-001",
-    fileName: "passport_john_doe.pdf",
-    category: "passport",
-    uploadedAt: "2024-01-15",
-    status: "uploaded",
+    _id: "1",
+    documentType: "passport",
+    documentName: "passport_john_doe.pdf",
     fileUrl: "/placeholder-doc.pdf",
-    fileType: "pdf",
-    customerId: "CUST-001",
+    status: "uploaded",
+    uploadedAt: "2024-01-15",
+    notes: [],
   },
   {
-    id: "2",
-    customerName: "Jane Smith",
-    applicationId: "APP-002",
-    fileName: "photo_jane_smith.jpg",
-    category: "photo",
-    uploadedAt: "2024-01-14",
-    status: "verified",
+    _id: "2",
+    documentType: "photo",
+    documentName: "photo_jane_smith.jpg",
     fileUrl: "/placeholder-image.jpg",
-    fileType: "image",
-    customerId: "CUST-002",
+    status: "verified",
+    uploadedAt: "2024-01-14",
+    notes: [],
   },
 ];
 
 export const DirectoryPage: React.FC = () => {
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [documents, setDocuments] = useState<DocumentItem[]>(mockDocuments);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
+  const [customerDocuments, setCustomerDocuments] = useState<DocumentApiItem[]>(
+    []
+  );
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [addingNoteDocId, setAddingNoteDocId] = useState<string | null>(null);
+  const [newNote, setNewNote] = useState<string>("");
+  const [applications, setApplications] = useState<any[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<any[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
 
-  const filteredDocuments = documents.filter((doc) => {
+  const customerId = user?.userId;
+
+  // Fetch applications and extract customers (like AgentDashboard)
+  React.useEffect(() => {
+    const fetchApplications = async () => {
+      setLoadingCustomers(true);
+      try {
+        if (!token) return;
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const apps = response.data.data || [];
+        setApplications(apps);
+        // Extract unique customers from applications
+        const uniqueCustomers: { [id: string]: Customer } = {};
+        apps.forEach((app: any) => {
+          if (app.customer && app.customer._id) {
+            uniqueCustomers[app.customer._id] = app.customer;
+          }
+        });
+        const customerList = Object.values(uniqueCustomers);
+        setCustomers(customerList);
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to load applications.",
+          variant: "destructive",
+        });
+        setCustomers([]);
+      } finally {
+        setLoadingCustomers(false);
+      }
+    };
+    fetchApplications();
+  }, [token, toast]);
+
+  // Fetch documents for selected customer
+  React.useEffect(() => {
+    const fetchDocs = async () => {
+      if (!selectedCustomer || !token) return;
+      setLoadingDocs(true);
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+            selectedCustomer._id
+          }`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setCustomerDocuments(res.data.data || []);
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to load documents.",
+          variant: "destructive",
+        });
+        setCustomerDocuments([]);
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+    fetchDocs();
+  }, [selectedCustomer, token, toast]);
+
+  // When a customer is selected, find their application and set notes
+  React.useEffect(() => {
+    if (!selectedCustomer) {
+      setCustomerNotes([]);
+      setSelectedApplication(null);
+      return;
+    }
+    setLoadingNotes(true);
+    // Find all applications for this customer
+    const customerApps = applications.filter(
+      (app) => app.customer && app.customer._id === selectedCustomer._id
+    );
+    if (customerApps.length > 0) {
+      setSelectedApplication(customerApps[0]);
+      setCustomerNotes(customerApps[0].notes || []);
+    } else {
+      setSelectedApplication(null);
+      setCustomerNotes([]);
+    }
+    setLoadingNotes(false);
+  }, [selectedCustomer, applications]);
+
+  const filteredDocuments = customerDocuments.filter((doc) => {
     const matchesSearch =
-      doc.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.applicationId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.fileName.toLowerCase().includes(searchTerm.toLowerCase());
+      doc.documentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.documentName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory =
-      selectedCategory === "all" || doc.category === selectedCategory;
+      selectedCategory === "all" || doc.documentType === selectedCategory;
     const matchesStatus =
       selectedStatus === "all" || doc.status === selectedStatus;
 
@@ -80,9 +192,9 @@ export const DirectoryPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "verified":
+      case "Approved":
         return "bg-green-100 text-green-800";
-      case "rejected":
+      case "Rejected":
         return "bg-red-100 text-red-800";
       default:
         return "bg-yellow-100 text-yellow-800";
@@ -106,202 +218,511 @@ export const DirectoryPage: React.FC = () => {
     }
   };
 
-  const handleDownload = (doc: DocumentItem) => {
-    console.log("Downloading:", doc.fileName);
-  };
-
-  const handleView = (doc: DocumentItem) => {
-    console.log("Viewing:", doc.fileName);
-    window.open(doc.fileUrl, "_blank");
-  };
-
   const handleUpload = () => {
     setIsUploadModalOpen(true);
   };
 
-  const handleVerify = (docId: string) => {
-    setDocuments((docs) =>
-      docs.map((doc) =>
-        doc.id === docId ? { ...doc, status: "verified" as const } : doc
-      )
-    );
+  // Approve/Reject document
+  const handleStatusUpdate = async (
+    docId: string,
+    status: "Approved" | "Rejected",
+    note?: string
+  ) => {
+    setActionLoading(docId + status);
+    try {
+      await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (status === "Rejected" && note) {
+        await axios.post(
+          `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
+          { message: note },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+      // Refresh documents
+      if (selectedCustomer) {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+            selectedCustomer._id
+          }`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setCustomerDocuments(res.data.data || []);
+      }
+      toast({
+        title: "Success",
+        description: `Document ${status.toLowerCase()}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update document status.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleReject = (docId: string) => {
-    setDocuments((docs) =>
-      docs.map((doc) =>
-        doc.id === docId ? { ...doc, status: "rejected" as const } : doc
-      )
-    );
+  // Add note to document
+  const handleAddNote = async (docId: string) => {
+    if (!newNote.trim()) return;
+    setActionLoading(docId + "note");
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
+        { message: newNote },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Refresh documents
+      if (selectedCustomer) {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+            selectedCustomer._id
+          }`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setCustomerDocuments(res.data.data || []);
+      }
+      setNewNote("");
+      setAddingNoteDocId(null);
+      toast({ title: "Success", description: "Note added." });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to add note.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleDocumentUpload = (newDocument: any) => {
-    setDocuments((prev) => [newDocument, ...prev]);
+  // Add note to application (not customer)
+  const [newCustomerNote, setNewCustomerNote] = useState("");
+  const [addingCustomerNote, setAddingCustomerNote] = useState(false);
+  const handleAddCustomerNote = async () => {
+    if (!newCustomerNote.trim() || !selectedApplication) return;
+    setActionLoading("customerNote");
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/application/note/${
+          selectedCustomer._id
+        }`,
+        { message: newCustomerNote },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setNewCustomerNote("");
+      setAddingCustomerNote(false);
+      // Refresh application and notes
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const apps = response.data.data || [];
+      setApplications(apps);
+      // Find the updated application and notes
+      const updatedApp = apps.find(
+        (app: any) => app._id === selectedApplication._id
+      );
+      setSelectedApplication(updatedApp);
+      setCustomerNotes(updatedApp?.notes || []);
+      toast({ title: "Success", description: "Note added." });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to add note.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Document Directory
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Review and manage customer documents
-          </p>
-        </div>
-        <Button
-          onClick={handleUpload}
-          className="bg-primary hover:bg-primary/90"
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          Upload Document
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search by customer name, application ID, or filename..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="passport">Passport</SelectItem>
-                <SelectItem value="photo">Photo</SelectItem>
-                <SelectItem value="visa">Visa</SelectItem>
-                <SelectItem value="invoice">Invoice</SelectItem>
-                <SelectItem value="government">Government</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="uploaded">Uploaded</SelectItem>
-                <SelectItem value="verified">Verified</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Documents Grid */}
-      <div className="grid gap-4">
-        {filteredDocuments.length === 0 ? (
+      <div className="flex gap-6">
+        {/* Customer List Sidebar */}
+        <div className="w-80 min-w-[18rem] max-h-[80vh] overflow-y-auto">
           <Card>
-            <CardContent className="p-12 text-center">
-              <div className="text-gray-400 mb-4">
-                <Filter className="w-12 h-12 mx-auto" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No documents found
-              </h3>
-              <p className="text-gray-600">
-                Try adjusting your search or filter criteria
-              </p>
+            <CardHeader>
+              <CardTitle>Customers</CardTitle>
+              <CardDescription>All customers with applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingCustomers ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading customers...
+                </div>
+              ) : customers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No customers found.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {customers.map((customer) => (
+                    <div
+                      key={customer._id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedCustomer?._id === customer._id
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-gray-50"
+                      }`}
+                      onClick={() => setSelectedCustomer(customer)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Avatar>
+                          <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                            {customer.firstName[0]}
+                            {customer.lastName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {customer.firstName} {customer.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {customer.email}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ) : (
-          filteredDocuments.map((doc) => (
-            <Card key={doc.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">
-                        {doc.fileName}
-                      </h3>
-                      <Badge className={getCategoryColor(doc.category)}>
-                        {doc.category}
-                      </Badge>
-                      <Badge className={getStatusColor(doc.status)}>
-                        {doc.status}
-                      </Badge>
+        </div>
+
+        {/* Documents for Selected Customer */}
+        <div className="flex-1">
+          {selectedCustomer ? (
+            <>
+              {/* Filters */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        placeholder="Search by document type or name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>
-                        <strong>Customer:</strong> {doc.customerName}
-                      </span>
-                      <span>
-                        <strong>App ID:</strong> {doc.applicationId}
-                      </span>
-                      <span>
-                        <strong>Uploaded:</strong>{" "}
-                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                      </span>
-                    </div>
+                    <Select
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                    >
+                      <SelectTrigger className="w-full md:w-48">
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="passport">Passport</SelectItem>
+                        <SelectItem value="photo">Photo</SelectItem>
+                        <SelectItem value="visa">Visa</SelectItem>
+                        <SelectItem value="invoice">Invoice</SelectItem>
+                        <SelectItem value="government">Government</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={selectedStatus}
+                      onValueChange={setSelectedStatus}
+                    >
+                      <SelectTrigger className="w-full md:w-48">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="uploaded">Uploaded</SelectItem>
+                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleView(doc)}
+                </CardContent>
+              </Card>
+
+              {/* Documents Grid */}
+              <div className="grid gap-4 mt-4">
+                {loadingDocs ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <div className="text-muted-foreground">
+                        Loading documents...
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : filteredDocuments.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <div className="text-gray-400 mb-4">
+                        <Filter className="w-12 h-12 mx-auto" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        No documents found
+                      </h3>
+                      <p className="text-gray-600">
+                        Try adjusting your search or filter criteria
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filteredDocuments.map((doc) => (
+                    <Card
+                      key={doc._id}
+                      className="hover:shadow-md transition-shadow"
                     >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(doc)}
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      Download
-                    </Button>
-                    {doc.status === "uploaded" && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleVerify(doc.id)}
-                          className="text-green-600 hover:text-green-700"
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          Verify
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleReject(doc.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Reject
-                        </Button>
-                      </>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold text-gray-900">
+                                {doc.documentType}
+                              </h3>
+                              <Badge
+                                className={getCategoryColor(doc.documentType)}
+                              >
+                                {doc.documentType}
+                              </Badge>
+                              <Badge className={getStatusColor(doc.status)}>
+                                {doc.status}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span>
+                                <strong>Customer:</strong>{" "}
+                                {selectedCustomer?.firstName}{" "}
+                                {selectedCustomer?.lastName}
+                              </span>
+                              <span>
+                                <strong>App ID:</strong> {doc.documentName}
+                              </span>
+                              <span>
+                                <strong>Uploaded:</strong>{" "}
+                                {doc.uploadedAt
+                                  ? new Date(
+                                      doc.uploadedAt
+                                    ).toLocaleDateString()
+                                  : ""}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(doc.fileUrl, "_blank")}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {}}
+                            >
+                              <Download className="w-4 h-4 mr-1" />
+                              Download
+                            </Button>
+                            {doc.status === "Pending" && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleStatusUpdate(doc._id, "Approved")
+                                  }
+                                  className="text-green-600 hover:text-green-700"
+                                  disabled={
+                                    actionLoading === doc._id + "Approved"
+                                  }
+                                >
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleStatusUpdate(doc._id, "Rejected")
+                                  }
+                                  className="text-red-600 hover:text-red-700"
+                                  disabled={
+                                    actionLoading === doc._id + "Rejected"
+                                  }
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAddingNoteDocId(doc._id)}
+                            >
+                              Add Note
+                            </Button>
+                            {addingNoteDocId === doc._id && (
+                              <div className="flex flex-col gap-2 mt-2">
+                                <textarea
+                                  className="border rounded p-1 text-xs"
+                                  placeholder="Enter note..."
+                                  value={newNote}
+                                  onChange={(e) => setNewNote(e.target.value)}
+                                  rows={2}
+                                  style={{ minWidth: 180 }}
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleAddNote(doc._id)}
+                                    disabled={
+                                      actionLoading === doc._id + "note" ||
+                                      !newNote.trim()
+                                    }
+                                  >
+                                    {actionLoading === doc._id + "note"
+                                      ? "Adding..."
+                                      : "Add Note"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setAddingNoteDocId(null);
+                                      setNewNote("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Select a customer to view documents.
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Below documents grid, show notes for selected customer */}
+      {selectedCustomer && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Notes</CardTitle>
+              <CardDescription>
+                Internal notes for this customer
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingNotes ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  Loading notes...
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    {addingCustomerNote ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          className="border rounded p-1 text-xs"
+                          placeholder="Enter note..."
+                          value={newCustomerNote}
+                          onChange={(e) => setNewCustomerNote(e.target.value)}
+                          rows={2}
+                          style={{ minWidth: 180 }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={handleAddCustomerNote}
+                            disabled={
+                              actionLoading === "customerNote" ||
+                              !newCustomerNote.trim()
+                            }
+                          >
+                            {actionLoading === "customerNote"
+                              ? "Adding..."
+                              : "Add Note"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setAddingCustomerNote(false);
+                              setNewCustomerNote("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAddingCustomerNote(true)}
+                      >
+                        + Add Note
+                      </Button>
                     )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
+                  {customerNotes.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      No notes yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customerNotes.map((note: any) => (
+                        <div
+                          key={note._id || note.id}
+                          className="border rounded p-3 bg-muted/30"
+                        >
+                          <div className="mb-1 text-sm">{note.message}</div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {note.addedBy?.fullName || note.author || "Agent"}
+                            </span>
+                            <span>
+                              {note.timestamp
+                                ? new Date(note.timestamp).toLocaleString()
+                                : ""}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
       {/* Document Upload Modal */}
       <DocumentUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
-        onUpload={handleDocumentUpload}
+        onUpload={() => {}}
       />
     </div>
   );

@@ -34,6 +34,11 @@ const agentNavItems = [
   { title: "Customers", url: "/agent/customers", icon: Users },
   { title: "Directory", url: "/agent/directory", icon: FileText },
   { title: "Chat", url: "/agent/chat", icon: MessageSquare },
+  {
+    title: "Visa Application",
+    url: "/agent/visa-applications",
+    icon: FileText,
+  },
   { title: "Settings", url: "/agent/settings", icon: Settings },
 ];
 
@@ -98,6 +103,17 @@ export const AgentSidebar: React.FC = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {/* <NavLink
+                to="/agent/visa-applications"
+                className={({ isActive }) =>
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                }
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {!isCollapsed && <span>Visa Applications</span>}
+              </NavLink> */}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

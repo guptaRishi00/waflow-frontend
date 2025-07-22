@@ -67,11 +67,14 @@ const StepManagement = ({
     if (!applicationId || !localSteps.length) return;
     setLoading(true);
     try {
-      const currentStep = localSteps.find(
-        (step: any) => step.status.toLowerCase() !== "approved"
-      ) || localSteps[localSteps.length - 1];
+      const currentStep =
+        localSteps.find(
+          (step: any) => step.status.toLowerCase() !== "approved"
+        ) || localSteps[localSteps.length - 1];
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/step/${applicationId}`,
+        `${
+          import.meta.env.VITE_BASE_URL
+        }/api/application/step/${applicationId}`,
         {
           stepName: currentStep.stepName,
           status: newStatus,
@@ -100,7 +103,9 @@ const StepManagement = ({
     setLoading(true);
     try {
       const response = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/application/note/${applicationId}`,
+        `${
+          import.meta.env.VITE_BASE_URL
+        }/api/application/note/${applicationId}`,
         {
           message: agentNotes,
           addedBy: user.userId,
@@ -193,9 +198,13 @@ const StepManagement = ({
           </Badge>
         );
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return null; // Return null for 'Unknown' status
     }
   };
+
+  // Helper to capitalize the first letter of a status
+  const formatStatus = (status: string) =>
+    status ? status.charAt(0).toUpperCase() + status.slice(1) : "";
 
   // Find the first non-approved step
   const currentStepIndex = steps.findIndex(
@@ -245,6 +254,11 @@ const StepManagement = ({
                         }`
                       : "All steps completed!"}
                   </span>
+                  {currentStepIndex < steps.length && (
+                    <span className="ml-2 px-2 py-1 rounded bg-muted text-xs font-medium">
+                      {formatStatus(steps[currentStepIndex1].status)}
+                    </span>
+                  )}
                 </div>
                 {currentStepIndex < steps.length &&
                   getStatusBadge(steps[currentStepIndex1].status)}
@@ -252,38 +266,7 @@ const StepManagement = ({
               {/* Dynamic Action Buttons for Current Step */}
               {currentStepIndex < steps.length && (
                 <div className="flex flex-wrap gap-2">
-                  {(() => {
-                    const status = steps[currentStepIndex1].status;
-                    const actions: { label: string; newStatus: string }[] = [];
-                    if (status === "Started") {
-                      actions.push({ label: "Submit for Review", newStatus: "Submitted for Review" });
-                      actions.push({ label: "Skip", newStatus: "Skipped" });
-                    } else if (status === "Submitted for Review") {
-                      actions.push({ label: "Await Response", newStatus: "Awaiting Response" });
-                      actions.push({ label: "Approve", newStatus: "Approved" });
-                      actions.push({ label: "Decline", newStatus: "Declined" });
-                    } else if (status === "Awaiting Response") {
-                      actions.push({ label: "Approve", newStatus: "Approved" });
-                      actions.push({ label: "Decline", newStatus: "Declined" });
-                    }
-                    return actions.map((action) => (
-                      <Button
-                        key={action.label}
-                        onClick={() => updateStepStatus(action.newStatus)}
-                        className="flex items-center gap-2"
-                        variant={
-                          action.newStatus === "Declined"
-                            ? "destructive"
-                            : action.newStatus === "Skipped"
-                            ? "outline"
-                            : "default"
-                        }
-                        disabled={loading}
-                      >
-                        {action.label}
-                      </Button>
-                    ));
-                  })()}
+                  {/* All action buttons removed as per user request */}
                 </div>
               )}
               {/* Agent Notes */}
@@ -344,58 +327,13 @@ const StepManagement = ({
                       >
                         Step {idx + 1}: {step.stepName}
                       </span>
+                      <span className="ml-2 px-2 py-1 rounded bg-muted text-xs font-medium">
+                        {formatStatus(step.status)}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusBadge(step.status)}
-                      {/* Action Buttons for each step */}
-                      {(() => {
-                        const status = step.status;
-                        const actions: { label: string; newStatus: string }[] =
-                          [];
-                        if (status === "Started") {
-                          actions.push({ label: "Submit for Review", newStatus: "Submitted for Review" });
-                          actions.push({ label: "Skip", newStatus: "Skipped" });
-                        } else if (status === "Submitted for Review") {
-                          actions.push({
-                            label: "Await Response",
-                            newStatus: "Awaiting Response",
-                          });
-                          actions.push({
-                            label: "Approve",
-                            newStatus: "Approved",
-                          });
-                          actions.push({
-                            label: "Decline",
-                            newStatus: "Declined",
-                          });
-                        } else if (status === "Awaiting Response") {
-                          actions.push({
-                            label: "Approve",
-                            newStatus: "Approved",
-                          });
-                          actions.push({
-                            label: "Decline",
-                            newStatus: "Declined",
-                          });
-                        }
-                        return actions.map((action) => (
-                          <Button
-                            key={action.label}
-                            onClick={() => updateStepStatus(action.newStatus)}
-                            className="flex items-center gap-2"
-                            variant={
-                              action.newStatus === "Declined"
-                                ? "destructive"
-                                : action.newStatus === "Skipped"
-                                ? "outline"
-                                : "default"
-                            }
-                            disabled={loading}
-                          >
-                            {action.label}
-                          </Button>
-                        ));
-                      })()}
+                      {/* Action Buttons for each step removed as per user request */}
                     </div>
                   </div>
                 ))}
@@ -405,7 +343,7 @@ const StepManagement = ({
         </Card>
 
         {/* Notes */}
-        {Array.isArray(localNotes) && localNotes.length > 0 && (
+        {Array.isArray(localNotes) && (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -414,17 +352,40 @@ const StepManagement = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[180px]">
-                <div className="space-y-3">
-                  {localNotes.map((note: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-muted/30 rounded-md text-sm"
-                    >
-                      <p className="text-muted-foreground">{note.message}</p>
+              <ScrollArea className="h-[220px]">
+                {localNotes.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                    <div className="font-medium">No notes yet.</div>
+                    <div className="text-xs">
+                      Add a note to keep track of important updates.
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {localNotes.map((note: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-lg border bg-white shadow-sm flex flex-col gap-2"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                          <span className="font-semibold text-sm text-primary">
+                            {note.addedBy?.fullName || note.author || "Agent"}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {note.timestamp
+                              ? new Date(note.timestamp).toLocaleString()
+                              : ""}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-800 whitespace-pre-line">
+                          {note.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
             </CardContent>
           </Card>

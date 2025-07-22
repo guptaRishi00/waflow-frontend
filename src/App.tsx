@@ -30,6 +30,7 @@ import { CustomersPage } from "./pages/agent/CustomersPage";
 import { DirectoryPage as AgentDirectoryPage } from "./pages/agent/DirectoryPage";
 import { AgentChatPage } from "./pages/agent/AgentChatPage";
 import { AgentSettings } from "./pages/agent/AgentSettings";
+import VisaApplicationsPage from "./pages/agent/VisaApplicationsPage";
 
 // Manager Pages
 import { ManagerDashboard } from "./pages/manager/ManagerDashboard";
@@ -110,6 +111,10 @@ const AppRoutes = () => {
                 <Route path="directory" element={<AgentDirectoryPage />} />
                 <Route path="chat" element={<AgentChatPage />} />
                 <Route path="settings" element={<AgentSettings />} />
+                <Route
+                  path="visa-applications"
+                  element={<VisaApplicationsPage />}
+                />
                 <Route
                   path="*"
                   element={<Navigate to="/agent/dashboard" replace />}
