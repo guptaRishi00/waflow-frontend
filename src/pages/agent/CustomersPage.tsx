@@ -56,6 +56,7 @@ interface Customer {
   paymentDetails?: string;
   createdAt: string;
   assignedAgentId?: string;
+  userId: string;
 }
 
 interface Application {
@@ -284,7 +285,20 @@ export const CustomersPage: React.FC = () => {
   }, []);
 
   const getCustomerApplications = (customerId: string) => {
-    return applications.filter((app) => app.customer === customerId);
+    return applications.filter((app) => {
+      if (!app.customer) return false;
+      if (typeof app.customer === "string") {
+        return app.customer === customerId;
+      } else if (
+        typeof app.customer === "object" &&
+        app.customer !== null &&
+        "_id" in app.customer &&
+        typeof (app.customer as { _id: string })._id === "string"
+      ) {
+        return (app.customer as { _id: string })._id === customerId;
+      }
+      return false;
+    });
   };
 
   const getCustomerName = (customer: Customer) => {
@@ -308,6 +322,14 @@ export const CustomersPage: React.FC = () => {
         .includes(searchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Add state for review note and loading per application
+  const [reviewNotes, setReviewNotes] = useState<{ [appId: string]: string }>(
+    {}
+  );
+  const [reviewLoading, setReviewLoading] = useState<{
+    [appId: string]: boolean;
+  }>({});
 
   if (loading) {
     return (
@@ -812,6 +834,159 @@ export const CustomersPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Applications List for Selected Customer */}
+              {console.log("selectedCustomer", selectedCustomer)}
+              <>
+                <CardContent>
+                  <div className="space-y-4">
+                    {getCustomerApplications(selectedCustomer._id).length ===
+                    0 ? (
+                      <div className="text-muted-foreground">
+                        No applications found.
+                      </div>
+                    ) : (
+                      getCustomerApplications(selectedCustomer._id).map(
+                        (app) => (
+                          <div
+                            key={app._id}
+                            className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                          >
+                            <div></div>
+                            <div className="flex gap-2 min-w-[220px]">
+                              <Textarea
+                                placeholder="Add a note (optional)"
+                                value={reviewNotes[app._id] || ""}
+                                onChange={(e) =>
+                                  setReviewNotes((prev) => ({
+                                    ...prev,
+                                    [app._id]: e.target.value,
+                                  }))
+                                }
+                                className="min-h-[36px]"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  disabled={reviewLoading[app._id]}
+                                  onClick={async () => {
+                                    setReviewLoading((prev) => ({
+                                      ...prev,
+                                      [app._id]: true,
+                                    }));
+                                    try {
+                                      await axios.patch(
+                                        `${
+                                          import.meta.env.VITE_BASE_URL
+                                        }/api/application/review-after-onboarding/${
+                                          app._id
+                                        }`,
+                                        {
+                                          decision: "approve",
+                                          note: reviewNotes[app._id] || "",
+                                        },
+                                        {
+                                          headers: {
+                                            Authorization: `Bearer ${token}`,
+                                          },
+                                        }
+                                      );
+                                      toast({
+                                        title: "Success",
+                                        description:
+                                          "Application marked as Ready for Processing",
+                                      });
+                                      fetchApplications();
+                                    } catch (err: any) {
+                                      console.error(
+                                        "Review error (approve):",
+                                        err?.response || err
+                                      );
+                                      toast({
+                                        title: "Error",
+                                        description:
+                                          err?.response?.data?.message ||
+                                          "Failed to review application.",
+                                        variant: "destructive",
+                                      });
+                                    } finally {
+                                      setReviewLoading((prev) => ({
+                                        ...prev,
+                                        [app._id]: false,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  {reviewLoading[app._id]
+                                    ? "Approving..."
+                                    : "Approve"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={reviewLoading[app._id]}
+                                  onClick={async () => {
+                                    setReviewLoading((prev) => ({
+                                      ...prev,
+                                      [app._id]: true,
+                                    }));
+                                    try {
+                                      await axios.patch(
+                                        `${
+                                          import.meta.env.VITE_BASE_URL
+                                        }/api/application/review-after-onboarding/${
+                                          app._id
+                                        }`,
+                                        {
+                                          decision: "clarify",
+                                          note: reviewNotes[app._id] || "",
+                                        },
+                                        {
+                                          headers: {
+                                            Authorization: `Bearer ${token}`,
+                                          },
+                                        }
+                                      );
+                                      toast({
+                                        title: "Success",
+                                        description:
+                                          "Clarification requested from customer",
+                                      });
+                                      fetchApplications();
+                                    } catch (err: any) {
+                                      console.error(
+                                        "Review error (clarify):",
+                                        err?.response || err
+                                      );
+                                      toast({
+                                        title: "Error",
+                                        description:
+                                          err?.response?.data?.message ||
+                                          "Failed to review application.",
+                                        variant: "destructive",
+                                      });
+                                    } finally {
+                                      setReviewLoading((prev) => ({
+                                        ...prev,
+                                        [app._id]: false,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  {reviewLoading[app._id]
+                                    ? "Requesting..."
+                                    : "Clarify"}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      )
+                    )}
+                  </div>
+                </CardContent>
+              </>
             </>
           )}
         </div>

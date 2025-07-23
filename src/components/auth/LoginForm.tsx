@@ -57,8 +57,9 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
     try {
       const response = await axios.post(
         import.meta.env.VITE_BASE_URL + "/api/auth/login",
-        { email, password },{
-          withCredentials: true
+        { email, password },
+        {
+          withCredentials: true,
         }
       );
 
@@ -210,61 +211,7 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
             </Button>
           </form>
 
-          {/* Demo Login Buttons */}
-          <div className="mt-6 space-y-3">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Demo Login
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() =>
-                  handleDemoLogin("manager_demo@waflow.com", "manager123")
-                }
-                disabled={isLoading}
-              >
-                <Badge className="h-4 w-4 mr-2" />
-                Login as Demo Manager
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() =>
-                  handleDemoLogin("agent_demo@waflow.com", "agent123")
-                }
-                disabled={isLoading}
-              >
-                <Briefcase className="h-4 w-4 mr-2" />
-                Login as Demo Agent
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() =>
-                  handleDemoLogin("customer_demo@waflow.com", "customer123")
-                }
-                disabled={isLoading}
-              >
-                <UserRound className="h-4 w-4 mr-2" />
-                Login as Demo Customer
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-6 text-center">
-            {/* Signup switch removed */}
-          </div>
+          <div className="mt-6 text-center">{/* Signup switch removed */}</div>
         </CardContent>
       </Card>
     </div>

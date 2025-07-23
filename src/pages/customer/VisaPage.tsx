@@ -29,6 +29,7 @@ import {
   XCircle,
   Clock,
   HelpCircle,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
@@ -85,30 +86,15 @@ interface SubmittedVisaApplication {
   members: VisaMember[];
   documents: any[];
   createdAt: string;
+  visaSubSteps?: any[];
 }
 
 export const VisaPage: React.FC = () => {
-  const [formData, setFormData] = useState<VisaFormData>({
-    firstName: "",
-    lastName: "",
-    applicationType: "",
-    nationality: "",
-    passportNumber: "",
-    passportExpiry: "",
+  const [formData, setFormData] = useState<{ emiratesId: string }>({
     emiratesId: "",
-    residenceAddress: "",
-    emergencyContact: "",
-    emergencyPhone: "",
   });
 
-  const [applicationStatus] = useState<
-    "draft" | "submitted" | "approved" | "rejected"
-  >("submitted");
-  const [appointmentLetter] = useState("visa_appointment_letter.pdf");
   const { user, token } = useSelector((state: RootState) => state.customerAuth);
-  const [applicationId, setApplicationId] = useState<string | null>(null);
-  const [visaSubSteps, setVisaSubSteps] = useState<VisaSubStep[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   // Remove VisaMember, members, memberForm, handleAddMember, handleRemoveMember, handleFileChange, handleVisaSubmit, and related UI.
   // Add state for required documents
@@ -122,86 +108,63 @@ export const VisaPage: React.FC = () => {
     SubmittedVisaApplication[]
   >([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Add state for fetched documents
+  const [documents, setDocuments] = useState<any[]>([]);
 
-  // Fetch applicationId and visaSubSteps
+  // Fetch submitted visa members for this customer
   useEffect(() => {
-    const fetchApplicationAndVisaSubSteps = async () => {
-      if (!user?.userId || !token) return;
-      setLoading(true);
+    const fetchVisaMembers = async () => {
+      if (!token || !user?.userId) return;
       try {
-        // 1. Get applicationId from dashboard endpoint
-        const dashboardRes = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/dashboard/customer/${
+        const res = await axios.get(
+          `${
+            import.meta.env.VITE_BASE_URL
+          }/api/application/visa-members/customer/${user.userId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setVisaMembers(
+          Array.isArray(res.data.visaMembers) ? res.data.visaMembers : []
+        );
+        console.log("Fetched visaMembers:", res.data.visaMembers);
+      } catch (err) {
+        setVisaMembers([]);
+      }
+    };
+    fetchVisaMembers();
+  }, [token, user]);
+
+  // Fetch all documents for this customer
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      if (!token || !user?.userId) return;
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
             user.userId
           }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        let appId = null;
-        if (
-          dashboardRes.data.application &&
-          dashboardRes.data.application._id
-        ) {
-          appId = dashboardRes.data.application._id;
-        } else if (dashboardRes.data.application?._id) {
-          appId = dashboardRes.data.application._id;
-        }
-        setApplicationId(appId);
-        if (!appId) {
-          setVisaSubSteps([]);
-          setLoading(false);
-          return;
-        }
-        // 2. Fetch application details (including visaSubSteps)
-        const appRes = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/application/${appId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const visaSubStepsArr = appRes.data.data.visaSubSteps || [];
-        setVisaSubSteps(visaSubStepsArr);
+        setDocuments(Array.isArray(res.data.data) ? res.data.data : []);
+        console.log("Fetched documents:", res.data.data);
       } catch (err) {
-        setVisaSubSteps([]);
-        toast({
-          title: "Error",
-          description: "Failed to load visa application data.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+        setDocuments([]);
       }
     };
-    fetchApplicationAndVisaSubSteps();
-  }, [user, token, toast]);
-
-  // Fetch submitted visa applications for this customer
-  useEffect(() => {
-    const fetchSubmittedVisas = async () => {
-      if (!token) return;
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        // Filter to only this customer
-        setSubmittedVisas(
-          res.data.data.filter((v: any) => v.customer?._id === user?.userId)
-        );
-      } catch (err) {
-        setSubmittedVisas([]);
-      }
-    };
-    fetchSubmittedVisas();
+    fetchDocuments();
   }, [token, user]);
 
-  const handleInputChange = (field: keyof VisaFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const [visaMembers, setVisaMembers] = useState<any[]>([]);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(visaMembers.length / itemsPerPage);
+  const paginatedMembers = visaMembers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Visa Application Submitted",
-      description: "Your visa application has been submitted for review.",
-    });
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   // Handle file selection for required docs
@@ -226,6 +189,10 @@ export const VisaPage: React.FC = () => {
         setSubmitting(false);
         return;
       }
+      // 2. Prepare member object with only emiratesId
+      const member = {
+        emiratesId: formData.emiratesId,
+      };
       // 1. Upload all required documents
       const allDocIds: string[] = [];
       for (const doc of requiredDocs) {
@@ -235,6 +202,7 @@ export const VisaPage: React.FC = () => {
         formDataDoc.append("documentName", doc.file!.name);
         formDataDoc.append("linkedTo", user?.userId || "");
         formDataDoc.append("linkedModel", "Customer");
+        formDataDoc.append("memberId", member.emiratesId); // Add memberId to document upload
         const res = await axios.post(
           `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
           formDataDoc,
@@ -249,22 +217,13 @@ export const VisaPage: React.FC = () => {
           allDocIds.push(res.data.data._id);
         }
       }
-      // 2. Prepare member object with required fields
-      const member = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        passportNumber: formData.passportNumber,
-        nationality: formData.nationality,
-        dob: "", // Not collected in form, use empty string
-        emiratesId: formData.emiratesId,
-      };
       // 3. Submit visa application (no applicationId required)
       const visaRes = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
+        `${import.meta.env.VITE_BASE_URL}/api/application/visa-member/${
+          user.userId
+        }`,
         {
-          customerId: user.userId,
-          members: [member],
-          documentIds: allDocIds,
+          memberId: member.emiratesId, // or the correct memberId value
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -273,18 +232,7 @@ export const VisaPage: React.FC = () => {
         description: "Your visa application has been submitted.",
       });
       setSubmittedVisas((prev) => [visaRes.data.data, ...prev]);
-      setFormData({
-        firstName: "",
-        lastName: "",
-        applicationType: "",
-        nationality: "",
-        passportNumber: "",
-        passportExpiry: "",
-        emiratesId: "",
-        residenceAddress: "",
-        emergencyContact: "",
-        emergencyPhone: "",
-      });
+      setFormData({ emiratesId: "" });
       setRequiredDocs((prev) => prev.map((doc) => ({ ...doc, file: null })));
     } catch (err: any) {
       toast({
@@ -330,49 +278,6 @@ export const VisaPage: React.FC = () => {
     );
   };
 
-  // Calculate overall progress
-  const totalSubsteps = visaSubSteps.reduce((acc, member) => acc + 4, 0);
-  const approvedSubsteps = visaSubSteps.reduce((acc, member) => {
-    return (
-      acc +
-      [
-        member.medical,
-        member.residenceVisa,
-        member.emiratesIdSoft,
-        member.emiratesIdHard,
-      ].filter((step) => step.status === "Approved").length
-    );
-  }, 0);
-
-  // Legend for status colors
-  const statusLegend = [
-    {
-      color: "bg-green-100 text-green-800",
-      label: "Approved",
-      icon: <CheckCircle className="h-4 w-4 mr-1" />,
-    },
-    {
-      color: "bg-yellow-100 text-yellow-800",
-      label: "Submitted/Other",
-      icon: <Clock className="h-4 w-4 mr-1" />,
-    },
-    {
-      color: "bg-gray-100 text-gray-800",
-      label: "Not Started",
-      icon: <HelpCircle className="h-4 w-4 mr-1" />,
-    },
-    {
-      color: "bg-red-100 text-red-800",
-      label: "Declined",
-      icon: <XCircle className="h-4 w-4 mr-1" />,
-    },
-    {
-      color: "bg-blue-100 text-blue-800",
-      label: "In Progress",
-      icon: <Info className="h-4 w-4 mr-1" />,
-    },
-  ];
-
   return (
     <TooltipProvider>
       <div className="space-y-8 max-w-4xl mx-auto px-2 md:px-0">
@@ -387,89 +292,8 @@ export const VisaPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleVisaFormSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) =>
-                      handleInputChange("firstName", e.target.value)
-                    }
-                    placeholder="Enter first name"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) =>
-                      handleInputChange("lastName", e.target.value)
-                    }
-                    placeholder="Enter last name"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="applicationType">Application Type</Label>
-                  <Select
-                    value={formData.applicationType}
-                    onValueChange={(value) =>
-                      handleInputChange("applicationType", value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select visa type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="investor">Investor Visa</SelectItem>
-                      <SelectItem value="employee">Employee Visa</SelectItem>
-                      <SelectItem value="partner">Partner Visa</SelectItem>
-                      <SelectItem value="family">Family Visa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="nationality">Nationality</Label>
-                  <Input
-                    id="nationality"
-                    value={formData.nationality}
-                    onChange={(e) =>
-                      handleInputChange("nationality", e.target.value)
-                    }
-                    placeholder="Enter your nationality"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="passportNumber">Passport Number</Label>
-                  <Input
-                    id="passportNumber"
-                    value={formData.passportNumber}
-                    onChange={(e) =>
-                      handleInputChange("passportNumber", e.target.value)
-                    }
-                    placeholder="Enter passport number"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="passportExpiry">Passport Expiry Date</Label>
-                  <Input
-                    id="passportExpiry"
-                    type="date"
-                    value={formData.passportExpiry}
-                    onChange={(e) =>
-                      handleInputChange("passportExpiry", e.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="md:col-span-2">
                   <Label htmlFor="emiratesId">Emirates ID (if available)</Label>
                   <Input
                     id="emiratesId"
@@ -478,49 +302,6 @@ export const VisaPage: React.FC = () => {
                       handleInputChange("emiratesId", e.target.value)
                     }
                     placeholder="Enter Emirates ID number"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="residenceAddress">
-                    UAE Residence Address
-                  </Label>
-                  <Textarea
-                    id="residenceAddress"
-                    value={formData.residenceAddress}
-                    onChange={(e) =>
-                      handleInputChange("residenceAddress", e.target.value)
-                    }
-                    placeholder="Enter your UAE residence address"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="emergencyContact">
-                    Emergency Contact Name
-                  </Label>
-                  <Input
-                    id="emergencyContact"
-                    value={formData.emergencyContact}
-                    onChange={(e) =>
-                      handleInputChange("emergencyContact", e.target.value)
-                    }
-                    placeholder="Enter emergency contact name"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="emergencyPhone">
-                    Emergency Contact Phone
-                  </Label>
-                  <Input
-                    id="emergencyPhone"
-                    value={formData.emergencyPhone}
-                    onChange={(e) =>
-                      handleInputChange("emergencyPhone", e.target.value)
-                    }
-                    placeholder="+971 50 123 4567"
                   />
                 </div>
               </div>
@@ -565,187 +346,110 @@ export const VisaPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* List of Submitted Visa Applications */}
+        {/* List of Visa Members */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Your Submitted Visa Applications</CardTitle>
+            <CardTitle>Your Visa Members</CardTitle>
             <CardDescription>
-              Track status and details of your submitted visa applications.
+              List of your submitted visa members.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {submittedVisas.length === 0 ? (
+            {visaMembers.length === 0 ? (
               <div className="text-muted-foreground">
-                No visa applications submitted yet.
+                No visa members found.
               </div>
             ) : (
-              <div className="space-y-4">
-                {submittedVisas.map((visa) => (
-                  <div
-                    key={visa._id}
-                    className="border rounded-lg p-4 bg-gray-50"
+              <>
+                <ul className="list-disc ml-6">
+                  {paginatedMembers.map((member) => (
+                    <li key={member._id} className="mb-4">
+                      <div>ID: {member._id}</div>
+                      {member.memberId && (
+                        <div>Member ID: {member.memberId}</div>
+                      )}
+                      <div>Status: {member.status}</div>
+                      <div>
+                        Updated:{" "}
+                        {member.updatedAt
+                          ? new Date(member.updatedAt).toLocaleString()
+                          : "N/A"}
+                      </div>
+                      {/* List documents for this memberId */}
+                      <div className="mt-2 ml-4">
+                        <div className="font-semibold">Documents:</div>
+                        <ul className="list-disc ml-4">
+                          {documents.filter(
+                            (doc) =>
+                              doc.memberId && doc.memberId === member.memberId
+                          ).length === 0 ? (
+                            <li className="text-muted-foreground">
+                              No documents found for this member.
+                            </li>
+                          ) : (
+                            documents
+                              .filter(
+                                (doc) =>
+                                  doc.memberId &&
+                                  doc.memberId === member.memberId
+                              )
+                              .map((doc) => (
+                                <li
+                                  key={doc._id}
+                                  className="flex items-center gap-2"
+                                >
+                                  {doc.documentName || doc.fileName || doc._id}
+                                  {doc.fileUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        window.open(
+                                          doc.fileUrl,
+                                          "_blank",
+                                          "noopener,noreferrer"
+                                        )
+                                      }
+                                      className="ml-2 p-1 rounded hover:bg-gray-200"
+                                      title="Preview"
+                                    >
+                                      <Eye className="w-4 h-4 text-blue-600" />
+                                    </button>
+                                  )}
+                                </li>
+                              ))
+                          )}
+                        </ul>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2 mt-4 items-center">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-2 py-1 border rounded"
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge
-                        className={
-                          visa.status === "Approved"
-                            ? "bg-green-100 text-green-800"
-                            : visa.status === "Rejected"
-                            ? "bg-red-100 text-red-800"
-                            : visa.status === "In Review"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }
-                      >
-                        {visa.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        Submitted {new Date(visa.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="font-semibold mb-1">Members:</div>
-                    <ul className="list-disc ml-6">
-                      {visa.members.map((m, idx) => (
-                        <li key={idx}>
-                          {m.firstName} {m.lastName} ({m.passportNumber},{" "}
-                          {m.nationality})
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="font-semibold mt-2 mb-1">Documents:</div>
-                    <ul className="list-disc ml-6">
-                      {visa.documents.map((doc, idx) => (
-                        <li key={idx}>
-                          {doc.documentName || doc.fileName || doc._id}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+                    Prev
+                  </button>
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(p + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="px-2 py-1 border rounded"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-              <User className="h-7 w-7 text-primary" /> Visa Application
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Track your UAE residence visa progress and substeps for all
-              applicants.
-            </p>
-          </div>
-          {totalSubsteps > 0 && (
-            <div className="flex flex-col items-end">
-              <span className="text-sm text-muted-foreground">
-                Overall Progress
-              </span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="font-semibold text-lg text-primary">
-                  {approvedSubsteps} / {totalSubsteps}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  substeps approved
-                </span>
-              </div>
-              <div className="w-40 h-2 bg-gray-200 rounded mt-1">
-                <div
-                  className="h-2 rounded bg-gradient-to-r from-primary to-secondary transition-all duration-500"
-                  style={{
-                    width: `${(approvedSubsteps / totalSubsteps) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Status Legend */}
-        <div className="flex flex-wrap gap-3 items-center mb-2">
-          {statusLegend.map((item) => (
-            <span
-              key={item.label}
-              className={`inline-flex items-center px-2 py-1 rounded ${item.color} text-xs font-medium`}
-            >
-              {item.icon}
-              {item.label}
-            </span>
-          ))}
-        </div>
-
-        {/* Visa Substeps Section */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-lg">Visa Application Progress</CardTitle>
-            <CardDescription>
-              Track the status of each visa substep for all members.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center text-muted-foreground py-8">
-                Loading visa substeps...
-              </div>
-            ) : visaSubSteps.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                No visa applicants or substeps found.
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {visaSubSteps.map((member, idx) => (
-                  <div
-                    key={member.memberId?._id || idx}
-                    className="border rounded-lg p-4 bg-gray-50"
-                  >
-                    <div className="mb-3 flex items-center gap-2 font-semibold text-primary">
-                      <User className="h-5 w-5" />
-                      {member.memberId?.firstName || "N/A"}{" "}
-                      {member.memberId?.lastName || ""}{" "}
-                      <span className="text-xs text-muted-foreground ml-2">
-                        ({member.memberId?.email || member.memberId?._id})
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        member.medical,
-                        member.residenceVisa,
-                        member.emiratesIdSoft,
-                        member.emiratesIdHard,
-                      ].map((step, i) => (
-                        <Tooltip key={i}>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center space-x-3 p-3 border rounded bg-white hover:shadow transition-all cursor-default">
-                              <span className="font-medium w-44">
-                                {step.stepName}
-                              </span>
-                              {getStatusBadge(step.status)}
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {step.updatedAt
-                                  ? new Date(step.updatedAt).toLocaleString()
-                                  : ""}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <span>Status: {step.status}</span>
-                            {step.updatedAt && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Last updated:{" "}
-                                {new Date(step.updatedAt).toLocaleString()}
-                              </div>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </TooltipProvider>
   );

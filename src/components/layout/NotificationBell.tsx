@@ -142,7 +142,7 @@ export const NotificationBell: React.FC = () => {
   };
 
   return (
-    <div className="relative">
+    <div className="hidden">
       <Button
         variant="ghost"
         size="sm"

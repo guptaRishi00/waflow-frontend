@@ -33,13 +33,13 @@ const agentNavItems = [
   { title: "Applications", url: "/agent/applications", icon: FileText },
   { title: "Customers", url: "/agent/customers", icon: Users },
   { title: "Directory", url: "/agent/directory", icon: FileText },
-  { title: "Chat", url: "/agent/chat", icon: MessageSquare },
+  // { title: "Chat", url: "/agent/chat", icon: MessageSquare },
   {
     title: "Visa Application",
     url: "/agent/visa-applications",
     icon: FileText,
   },
-  { title: "Settings", url: "/agent/settings", icon: Settings },
+  // { title: "Settings", url: "/agent/settings", icon: Settings },
 ];
 
 export const AgentSidebar: React.FC = () => {

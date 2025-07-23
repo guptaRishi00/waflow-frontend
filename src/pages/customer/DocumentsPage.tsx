@@ -297,20 +297,22 @@ export const DocumentsPage: React.FC = () => {
       if (!user?.userId) return;
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/dashboard/customer/${
-            user.userId
-          }`,
+          `${import.meta.env.VITE_BASE_URL}/api/application/app/${user.userId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
         let stepsArr = [];
         let appId = null;
-        if (res.data.application && Array.isArray(res.data.application.steps)) {
+        if (res.data && Array.isArray(res.data.steps)) {
+          stepsArr = res.data.steps;
+          appId = res.data._id;
+        } else if (
+          res.data &&
+          res.data.application &&
+          Array.isArray(res.data.application.steps)
+        ) {
           stepsArr = res.data.application.steps;
           appId = res.data.application._id;
-        } else if (Array.isArray(res.data.steps)) {
-          stepsArr = res.data.steps;
-          appId = res.data.application?._id || null;
         }
         setSteps(stepsArr);
         setApplicationId(appId);
