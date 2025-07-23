@@ -836,7 +836,6 @@ export const CustomersPage: React.FC = () => {
               </Card>
 
               {/* Applications List for Selected Customer */}
-              {console.log("selectedCustomer", selectedCustomer)}
               <>
                 <CardContent>
                   <div className="space-y-4">

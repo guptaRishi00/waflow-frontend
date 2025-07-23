@@ -119,32 +119,6 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
   return (
     <div className="space-y-6">
       {/* New Registration Entry Module */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="waflow-gradient w-12 h-12 rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg waflow-text-gradient">
-                  Begin Company Registration Process
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Start your UAE business registration - Step-by-Step guided
-                  form
-                </p>
-              </div>
-            </div>
-            <Button asChild className="bg-primary hover:bg-primary/90">
-              <Link to="/start-registration">
-                Start Now
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Login Form */}
       <Card className="w-full max-w-md">

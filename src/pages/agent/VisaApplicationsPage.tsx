@@ -66,24 +66,30 @@ const VisaApplicationsPage: React.FC = () => {
     currentPage * itemsPerPage
   );
 
-  // Fetch customers assigned to the agent
+  // Fetch customers assigned to agent
   useEffect(() => {
     const fetchCustomers = async () => {
       if (!token) return;
       setLoading(true);
       try {
+        // Decode token to get agent ID
+        const tokenPayload = JSON.parse(atob(token.split(".")[1]));
+        const agentId = tokenPayload.userId || tokenPayload.id;
+        // Fetch all customers
         const res = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        const customerData = res.data.data || [];
-        setCustomers(customerData);
-        // Automatically select the first customer if the list is not empty
-        if (customerData.length > 0) {
-          setSelectedCustomer(customerData[0]);
+        const allCustomers = res.data.data || [];
+        // Filter customers assigned to this agent
+        const agentCustomers = allCustomers.filter(
+          (customer: any) => customer.assignedAgentId === agentId
+        );
+        setCustomers(agentCustomers);
+        if (agentCustomers.length > 0) {
+          setSelectedCustomer(agentCustomers[0]);
         }
       } catch (err) {
-        console.error("Failed to fetch customers:", err);
         setCustomers([]);
         toast({
           title: "Error",
