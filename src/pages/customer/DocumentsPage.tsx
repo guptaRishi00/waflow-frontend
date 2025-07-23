@@ -238,9 +238,10 @@ export const DocumentsPage: React.FC = () => {
         const uploaded = uploadedDocs.find(
           (u: any) => u.documentType === reqDoc.type
         );
+        // Only set status if document exists, otherwise always 'not-started'
         return {
           ...reqDoc,
-          status: uploaded ? uploaded.status : "not-uploaded",
+          status: uploaded && uploaded._id ? uploaded.status : "not-started",
           fileName: uploaded?.fileName,
           uploadedAt: uploaded?.uploadedAt,
           rejectionReason: uploaded?.rejectionReason,
@@ -260,6 +261,11 @@ export const DocumentsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Ensure status is 'not-started' if document does not exist on every reload or change
+  useEffect(() => {
+    fetchAndMergeDocuments();
+  }, [user, token, toast]);
 
   // Fetch uploaded document for the current step
   const fetchStepDocuments = async (stepName: string) => {
@@ -414,8 +420,6 @@ export const DocumentsPage: React.FC = () => {
         uploadedDocs={stepDocuments}
         stepName={selectedStep}
       />
-
-      <AddNote />
 
       {/* Help Text */}
       <Card>

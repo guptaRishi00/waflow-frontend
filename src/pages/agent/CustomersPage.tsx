@@ -37,10 +37,23 @@ import { RootState } from "@/app/store";
 interface Customer {
   _id: string;
   firstName: string;
+  middleName?: string;
   lastName: string;
+  dob?: string;
   email: string;
   phoneNumber?: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  nationality?: string;
+  gender?: string;
+  designation?: string;
   companyType?: string;
+  jurisdiction?: string;
+  businessActivity1?: string;
+  officeType?: string;
+  quotedPrice?: number;
+  paymentPlans?: string[] | string;
+  paymentDetails?: string;
   createdAt: string;
   assignedAgentId?: string;
 }
@@ -696,7 +709,6 @@ export const CustomersPage: React.FC = () => {
                         </CardDescription>
                       </div>
                     </div>
-
                     <div className="flex items-center space-x-2">
                       <Button size="sm" variant="outline" asChild>
                         <Link
@@ -709,118 +721,95 @@ export const CustomersPage: React.FC = () => {
                     </div>
                   </div>
                 </CardHeader>
-
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{selectedCustomer.email}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <strong>First Name:</strong>{" "}
+                      {selectedCustomer.firstName || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Middle Name:</strong>{" "}
+                      {selectedCustomer.middleName || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Last Name:</strong>{" "}
+                      {selectedCustomer.lastName || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Date of Birth:</strong>{" "}
+                      {selectedCustomer.dob
+                        ? new Date(selectedCustomer.dob).toLocaleDateString()
+                        : "N/A"}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {selectedCustomer.email || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Phone Number:</strong>{" "}
+                      {selectedCustomer.phoneNumber || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Current Address:</strong>{" "}
+                      {selectedCustomer.currentAddress || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Permanent Address:</strong>{" "}
+                      {selectedCustomer.permanentAddress || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Nationality:</strong>{" "}
+                      {selectedCustomer.nationality || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Gender:</strong>{" "}
+                      {selectedCustomer.gender || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Designation:</strong>{" "}
+                      {selectedCustomer.designation || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Company Type:</strong>{" "}
+                      {selectedCustomer.companyType || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Jurisdiction:</strong>{" "}
+                      {selectedCustomer.jurisdiction || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Business Activity:</strong>{" "}
+                      {selectedCustomer.businessActivity1 || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Office Type:</strong>{" "}
+                      {selectedCustomer.officeType || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Quoted Price:</strong>{" "}
+                      {selectedCustomer.quotedPrice || "N/A"}
+                    </div>
+                    <div>
+                      <strong>Payment Plans:</strong>{" "}
+                      {selectedCustomer.paymentPlans
+                        ? Array.isArray(selectedCustomer.paymentPlans)
+                          ? selectedCustomer.paymentPlans.join(", ")
+                          : selectedCustomer.paymentPlans
+                        : "N/A"}
+                    </div>
+                    <div className="md:col-span-2">
+                      <strong>Payment Details:</strong>{" "}
+                      {selectedCustomer.paymentDetails || "N/A"}
                     </div>
 
-                    {selectedCustomer.phoneNumber && (
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {selectedCustomer.phoneNumber}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">UAE</span>
+                    <div>
+                      <strong>Created At:</strong>{" "}
+                      {selectedCustomer.createdAt
+                        ? new Date(
+                            selectedCustomer.createdAt
+                          ).toLocaleDateString()
+                        : "N/A"}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Customer Applications */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Applications</CardTitle>
-                  <CardDescription>
-                    Business registration applications for this customer
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    const customerApps = getCustomerApplications(
-                      selectedCustomer._id
-                    );
-                    return customerApps.length > 0 ? (
-                      <div className="space-y-4">
-                        {customerApps.map((app) => (
-                          <div key={app._id} className="p-4 border rounded-lg">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <h4 className="font-semibold">
-                                  {getCustomerName(selectedCustomer)}
-                                </h4>
-                                <p className="text-sm text-muted-foreground">
-                                  {app._id} •{" "}
-                                  {selectedCustomer.companyType || "Individual"}
-                                </p>
-                              </div>
-                              <Badge
-                                variant={
-                                  app.status === "In Progress"
-                                    ? "secondary"
-                                    : "default"
-                                }
-                                className={
-                                  app.status === "In Progress"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : ""
-                                }
-                              >
-                                {app.status.replace(" ", "-")}
-                              </Badge>
-                            </div>
-
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span>Progress</span>
-                                <span>{getCurrentStep(app)}/8 steps</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full"
-                                  style={{
-                                    width: `${
-                                      (getCurrentStep(app) / 8) * 100
-                                    }%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <Button size="sm" variant="outline" asChild>
-                                <Link to={`/agent/applications`}>
-                                  <FileText className="h-4 w-4 mr-1" />
-                                  Manage
-                                </Link>
-                              </Button>
-
-                              <Button size="sm" variant="outline" asChild>
-                                <Link to={`/agent/chat?application=${app._id}`}>
-                                  <MessageSquare className="h-4 w-4 mr-1" />
-                                  Chat
-                                </Link>
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">
-                          No applications found for this customer
-                        </p>
-                      </div>
-                    );
-                  })()}
                 </CardContent>
               </Card>
             </>

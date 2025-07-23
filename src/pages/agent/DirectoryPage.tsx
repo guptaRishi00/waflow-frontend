@@ -222,51 +222,6 @@ export const DirectoryPage: React.FC = () => {
     setIsUploadModalOpen(true);
   };
 
-  // Approve/Reject document
-  const handleStatusUpdate = async (
-    docId: string,
-    status: "Approved" | "Rejected",
-    note?: string
-  ) => {
-    setActionLoading(docId + status);
-    try {
-      await axios.put(
-        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (status === "Rejected" && note) {
-        await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
-          { message: note },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-      // Refresh documents
-      if (selectedCustomer) {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
-            selectedCustomer._id
-          }`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setCustomerDocuments(res.data.data || []);
-      }
-      toast({
-        title: "Success",
-        description: `Document ${status.toLowerCase()}.`,
-      });
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to update document status.",
-        variant: "destructive",
-      });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   // Add note to document
   const handleAddNote = async (docId: string) => {
     if (!newNote.trim()) return;
@@ -531,38 +486,6 @@ export const DirectoryPage: React.FC = () => {
                               <Download className="w-4 h-4 mr-1" />
                               Download
                             </Button>
-                            {doc.status === "Pending" && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleStatusUpdate(doc._id, "Approved")
-                                  }
-                                  className="text-green-600 hover:text-green-700"
-                                  disabled={
-                                    actionLoading === doc._id + "Approved"
-                                  }
-                                >
-                                  <Check className="w-4 h-4 mr-1" />
-                                  Approve
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleStatusUpdate(doc._id, "Rejected")
-                                  }
-                                  className="text-red-600 hover:text-red-700"
-                                  disabled={
-                                    actionLoading === doc._id + "Rejected"
-                                  }
-                                >
-                                  <X className="w-4 h-4 mr-1" />
-                                  Reject
-                                </Button>
-                              </>
-                            )}
                             <Button
                               variant="outline"
                               size="sm"

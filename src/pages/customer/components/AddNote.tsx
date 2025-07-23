@@ -14,18 +14,18 @@ interface ApiErrorResponse {
   message: string;
 }
 
-export default function AddNote() {
+interface AddNoteProps {
+  docId: string;
+}
+
+export default function AddNote({ docId }: AddNoteProps) {
   const [note, setNote] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
-  const { user } = useSelector((state: RootState) => state.customerAuth);
-  const customerId = user?.userId;
-
   const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNote(e.target.value);
-    // Clear messages when user starts typing
     if (error) setError(null);
     if (success) setSuccess(null);
   };
@@ -47,9 +47,8 @@ export default function AddNote() {
         return;
       }
 
-      // Simulate API call since axios isn't available in artifacts
       const response = await fetch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/note/${customerId}`,
+        `${import.meta.env.VITE_BASE_URL}/api/document/${docId}/note`,
         {
           method: "POST",
           headers: {
@@ -87,23 +86,19 @@ export default function AddNote() {
       {/* Textarea */}
       <div className="relative">
         <Textarea
-          placeholder="Add a note for this customer... (Ctrl+Enter to submit)"
+          placeholder="Add a note for this document... (Ctrl+Enter to submit)"
           value={note}
           onChange={handleNoteChange}
           onKeyDown={handleKeyDown}
           className="min-h-[120px] resize-y border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl px-6 py-4 text-base placeholder:text-gray-400 shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg"
           disabled={isLoading}
         />
-
-        {/* Status indicator */}
         {note.trim() && !isLoading && (
           <div className="absolute right-4 top-4">
             <div className="h-2 w-2 rounded-full bg-green-400"></div>
           </div>
         )}
       </div>
-
-      {/* Submit Button */}
       <Button
         onClick={handleSubmit}
         disabled={isLoading || !note.trim()}
@@ -121,8 +116,6 @@ export default function AddNote() {
           </div>
         )}
       </Button>
-
-      {/* Feedback Messages */}
       {(error || success) && (
         <div className="text-center">
           {error && (
