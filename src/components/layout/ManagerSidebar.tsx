@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Shield,
@@ -25,15 +25,16 @@ import {
 } from "@/components/ui/sidebar";
 // import { useAuth } from '@/contexts/AuthContext';
 import { Button } from "@/components/ui/button";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import { logout } from "@/features/customerAuthSlice";
 
 const managerNavItems = [
   { title: "Dashboard", url: "/manager/dashboard", icon: LayoutDashboard },
   { title: "Agents", url: "/manager/agents", icon: Shield },
   { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Customers", url: "/manager/customers", icon: Users },
-  { title: "Directory", url: "/manager/directory", icon: FolderOpen },
+  { title: "Documents", url: "/manager/directory", icon: FolderOpen },
   { title: "Settings", url: "/manager/settings", icon: Settings },
 ];
 
@@ -42,6 +43,14 @@ export const ManagerSidebar: React.FC = () => {
   const location = useLocation();
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const isCollapsed = state === "collapsed";
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/auth");
+  };
 
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
@@ -127,6 +136,7 @@ export const ManagerSidebar: React.FC = () => {
             variant="ghost"
             size="sm"
             className="w-full justify-start text-sidebar-foreground hover:bg-red-500/10 hover:text-red-400"
+            onClick={handleLogout}
           >
             <LogOut className="mr-2 h-4 w-4" />
             {!isCollapsed && <span>Logout</span>}

@@ -31,6 +31,7 @@ export interface Application {
     lastName: string;
     email: string;
     phoneNumber?: string;
+    id: string;
   };
   assignedAgent?: {
     _id: string;

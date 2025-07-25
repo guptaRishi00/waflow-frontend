@@ -1,189 +1,381 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Eye, MessageSquare, DollarSign, Filter } from 'lucide-react';
-import { mockApplications } from '@/lib/mock-data';
-import { Link } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
-import { ApplicationDetailsModal } from '@/components/common/ApplicationDetailsModal';
-import type { Application } from '@/types';
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Eye, MessageSquare, DollarSign, Filter } from "lucide-react";
+import { mockApplications } from "@/lib/mock-data";
+import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { ApplicationDetailsModal } from "@/components/common/ApplicationDetailsModal";
+import type { Application } from "@/types";
+import ApplicationCard from "./ApplicationCard";
+import StepManagement from "./StepManagement";
+import axios from "axios";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
+import CustomerDocuments from "./CustomerDocuments";
 
 export const ManagerApplicationsPage: React.FC = () => {
-  const [applications] = useState(mockApplications);
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [selectedApp, setSelectedApp] = useState(applications[0]);
+  const [agentNotes, setAgentNotes] = useState("");
+  const [stepStatus, setStepStatus] = useState<string>("");
+  const [selectedApplication, setSelectedApplication] =
+    useState<Application | null>(null);
   const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
   const { toast } = useToast();
+  const { token } = useSelector((state: RootState) => state.customerAuth);
+  const [stepActionLoading, setStepActionLoading] = useState(false);
+  const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
+  const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
+  // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
+
+  const [demo, setDemo] = useState(null);
+
+  // Fetch applications (already present)
+  useEffect(() => {
+    const fetchApplications = async () => {
+      if (!token) return;
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const apps = response.data.data;
+        setApplications(apps);
+        console.log("Fetched applications:", apps);
+      } catch (err) {
+        console.error("Error fetching applications:", err);
+      }
+    };
+    fetchApplications();
+  }, [token]);
+
+  // Ensure selectedApp is set after applications load
+  useEffect(() => {
+    if (applications.length > 0 && !selectedApp) {
+      setSelectedApp(applications[0]);
+    }
+  }, [applications, selectedApp]);
+
+  // Fetch customer profile and documents for selectedApp
+  useEffect(() => {
+    const fetchCustomerProfileAndDocuments = async () => {
+      if (!demo || !demo[0] || !demo[0].customer || !demo[0].customer._id)
+        return;
+      const customerId = demo[0].customer._id;
+      try {
+        console.log("Fetching customer profile for:", customerId);
+        // Fetch customer profile by ID
+        const customerProfileRes = await axios.get(
+          `${
+            import.meta.env.VITE_BASE_URL
+          }/api/user/customer/profile/${customerId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log("Fetched customer profile:", customerProfileRes.data.data);
+
+        console.log("Fetching customer documents for:", customerId);
+        // Fetch customer documents by customer ID
+        const customerDocsRes = await axios.get(
+          `${
+            import.meta.env.VITE_BASE_URL
+          }/api/document/customer/${customerId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log("Fetched customer documents:", customerDocsRes.data.data);
+      } catch (err) {
+        console.error("Error fetching customer profile or documents:", err);
+        if (err.response) {
+          console.error("Error response data:", err.response.data);
+        }
+      }
+    };
+    fetchCustomerProfileAndDocuments();
+  }, [token, selectedApp, demo]);
+
+  // Fetch customer documents for selectedApp
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      if (
+        !selectedApp ||
+        !selectedApp.customer ||
+        !selectedApp.customer._id ||
+        !selectedApp._id ||
+        !token
+      )
+        return;
+      console.log(
+        "Fetching documents for customer:",
+        selectedApp.customer._id,
+        "and application:",
+        selectedApp._id
+      );
+      try {
+        // Fetch customer-linked documents
+        const customerRes = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
+            selectedApp.customer._id
+          }`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setCustomerDocuments(customerRes.data.data || []);
+        console.log(
+          "API response for customerDocuments:",
+          customerRes.data.data
+        );
+      } catch (err) {
+        setCustomerDocuments([]);
+        console.error("Error fetching customer documents:", err);
+      }
+      try {
+        // Fetch application-linked documents
+        const appRes = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/document/application/${
+            selectedApp._id
+          }`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setApplicationDocuments(appRes.data.data || []);
+      } catch (err) {
+        setApplicationDocuments([]);
+        console.error("Error fetching application documents:", err);
+      }
+    };
+    fetchDocuments();
+  }, [selectedApp, token]);
+
+  // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
+
+  const handleUpdateStep = () => {
+    toast({
+      title: "Step Updated",
+      description: "Application step has been updated successfully.",
+    });
+  };
+
+  const handleCreateInvoice = () => {
+    toast({
+      title: "Invoice Created",
+      description: "Invoice has been created and sent to customer.",
+    });
+  };
 
   const handleViewApplication = (application: Application) => {
     setSelectedApplication(application);
     setIsApplicationModalOpen(true);
   };
 
-  const handleAssignAgent = (applicationId: string) => {
-    toast({
-      title: "Agent Assigned",
-      description: "Application has been assigned to an agent successfully.",
-    });
+  // Approve/Reject handler for ProgressTracker
+  const handleStepAction = async (
+    stepIndex: number,
+    action: "approve" | "reject"
+  ) => {
+    if (!selectedApp || !selectedApp.steps || !selectedApp._id) return;
+    const step = selectedApp.steps[stepIndex];
+    if (!step) return;
+    setStepActionLoading(true);
+    try {
+      const response = await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/step/${
+          selectedApp._id
+        }`,
+        {
+          stepName: step.stepName,
+          status: action === "approve" ? "Approved" : "Declined",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update local state with new application data
+      const updatedApp = response.data.application;
+      setSelectedApp(updatedApp);
+      setApplications((prev) =>
+        prev.map((a) => (a._id === updatedApp._id ? updatedApp : a))
+      );
+      toast({
+        title: `Step ${action === "approve" ? "Approved" : "Rejected"}`,
+        description: `Step "${step.stepName}" has been ${
+          action === "approve" ? "approved" : "rejected"
+        }.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update step status.",
+        variant: "destructive",
+      });
+      console.error("Error updating step status:", err);
+    } finally {
+      setStepActionLoading(false);
+    }
+  };
+
+  // Add a function to refetch the selected application from the backend
+  const refetchSelectedApplication = async () => {
+    if (!selectedApp || !selectedApp._id || !token) return;
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application/${selectedApp._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedApp = response.data.data;
+      setSelectedApp(updatedApp);
+      setApplications((prev) =>
+        prev.map((a) => (a._id === updatedApp._id ? updatedApp : a))
+      );
+    } catch (err) {
+      console.error("Error refetching application:", err);
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full px-4">
       <div>
-        <h1 className="text-3xl font-bold text-primary">All Applications</h1>
+        <h1 className="text-3xl font-bold text-primary">
+          Applications Management
+        </h1>
         <p className="text-muted-foreground">
-          Overview of all customer applications across all agents
+          Manage customer applications and track progress
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-primary">{applications.length}</p>
-              <p className="text-sm text-muted-foreground">Total Applications</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+        {/* Applications List */}
+        {applications.map((app, index) => (
+          <div key={app._id ?? index} className="mb-2">
+            <div className="text-xs text-muted-foreground mb-1">
+              <strong>Customer ID:</strong> {app.customer?._id || "N/A"} |{" "}
+              <strong>Email:</strong> {app.customer?.email || "N/A"}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {applications.filter(app => app.status === 'approved').length}
-              </p>
-              <p className="text-sm text-muted-foreground">Approved</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-600">
-                {applications.filter(app => app.status === 'under-review').length}
-              </p>
-              <p className="text-sm text-muted-foreground">Under Review</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">
-                {applications.filter(app => app.status === 'submitted').length}
-              </p>
-              <p className="text-sm text-muted-foreground">Submitted</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <ApplicationCard
+              app={app}
+              selectedApp={selectedApp}
+              setSelectedApp={setSelectedApp}
+              applications={applications}
+            />
+          </div>
+        ))}
+        {/* Application Details */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Application Header */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {selectedApp?.customer?.firstName}{" "}
+                    {selectedApp?.customer?.lastName}
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedApp?._id} • {selectedApp?.customer?.email} •
+                    Created{" "}
+                    {selectedApp
+                      ? new Date(selectedApp.createdAt).toLocaleDateString()
+                      : ""}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleViewApplication(selectedApp)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Details
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <Link
+                      to={
+                        selectedApp
+                          ? `/agent/customers/${selectedApp.customer?._id}`
+                          : "#"
+                      }
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Customer
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <Link
+                      to={
+                        selectedApp
+                          ? `/agent/chat?application=${selectedApp._id}`
+                          : "#"
+                      }
+                    >
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Chat
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCreateInvoice}
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Invoice
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
 
-      {/* Applications Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Applications Overview</CardTitle>
-              <CardDescription>All customer applications with status and progress</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-3">Application ID</th>
-                  <th className="text-left p-3">Business Name</th>
-                  <th className="text-left p-3">Type</th>
-                  <th className="text-left p-3">Status</th>
-                  <th className="text-left p-3">Progress</th>
-                  <th className="text-left p-3">Agent</th>
-                  <th className="text-left p-3">Created</th>
-                  <th className="text-left p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map((app) => (
-                  <tr key={app.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">
-                      <Badge variant="outline" className="font-mono text-xs">
-                        {app.id}
-                      </Badge>
-                    </td>
-                    <td className="p-3 font-medium">{app.businessName}</td>
-                    <td className="p-3 capitalize">{app.businessType}</td>
-                    <td className="p-3">
-                      <Badge 
-                        variant={app.status === 'under-review' ? 'secondary' : 'default'}
-                        className={
-                          app.status === 'under-review' 
-                            ? 'bg-yellow-100 text-yellow-800' 
-                            : app.status === 'approved'
-                            ? 'bg-green-100 text-green-800'
-                            : ''
-                        }
-                      >
-                        {app.status.replace('-', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full"
-                            style={{ width: `${(app.currentStep / 8) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {app.currentStep}/8
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      {app.agentId ? (
-                        <span className="text-sm">Agent {app.agentId}</span>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleAssignAgent(app.id)}
-                        >
-                          Assign
-                        </Button>
-                      )}
-                    </td>
-                    <td className="p-3 text-sm text-muted-foreground">
-                      {new Date(app.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex space-x-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          onClick={() => handleViewApplication(app)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link to={`/manager/chat?application=${app.id}`}>
-                            <MessageSquare className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Progress Tracker */}
+          {/* Visa Section replacing Application Steps */}
+          {/* Remove the Card with VisaApplicationsList from the render */}
+
+          {/* Customer Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Documents</CardTitle>
+              <CardDescription>
+                All documents uploaded by the customer or for this application
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CustomerDocuments
+                selectedApp={selectedApp}
+                token={token}
+                onApplicationRefetch={refetchSelectedApplication}
+                visaDocuments={[]} // No longer fetching visa documents here
+              />
+            </CardContent>
+          </Card>
+
+          {/* Step Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Update Application Step</CardTitle>
+              <CardDescription>
+                Manage the current step and add agent notes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedApp && (
+                <StepManagement
+                  applicationId={selectedApp._id}
+                  steps={selectedApp.steps}
+                  status={selectedApp.status}
+                  notes={selectedApp.notes}
+                  stepStatus={stepStatus}
+                  setStepStatus={setStepStatus}
+                  agentNotes={agentNotes}
+                  setAgentNotes={setAgentNotes}
+                  handleUpdateStep={handleUpdateStep}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Application Details Modal */}
       <ApplicationDetailsModal

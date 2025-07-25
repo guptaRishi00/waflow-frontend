@@ -26,7 +26,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         return <CustomerSidebar />;
       case "agent":
         return <AgentSidebar />;
-      case "manager":
+      case "admin":
         return <ManagerSidebar />;
       default:
         return <CustomerSidebar />;
@@ -39,7 +39,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         return "Customer Portal";
       case "agent":
         return "Agent Portal";
-      case "manager":
+      case "admin":
         return "Manager Portal";
       default:
         return "Portal";
