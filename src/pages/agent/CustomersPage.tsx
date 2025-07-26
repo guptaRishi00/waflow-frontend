@@ -11,6 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Search,
   MessageSquare,
   FileText,
@@ -18,6 +25,7 @@ import {
   Mail,
   MapPin,
   Plus,
+  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -78,6 +86,7 @@ export const CustomersPage: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
+  const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
 
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
@@ -142,6 +151,11 @@ export const CustomersPage: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle Select field changes
+  const handleSelectChange = (name: string, value: string) => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -313,6 +327,23 @@ export const CustomersPage: React.FC = () => {
     return app.steps.filter(
       (step) => step.status === "Submitted" || step.status === "Approved"
     ).length;
+  };
+
+  // Fetch customer documents
+  const fetchCustomerDocuments = async (customerId: string) => {
+    if (!token) return;
+    try {
+      console.log("Fetching documents for customer:", customerId);
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${customerId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log("Documents response:", response.data);
+      setCustomerDocuments(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching customer documents:", error);
+      setCustomerDocuments([]);
+    }
   };
 
   const filteredCustomers = customers.filter(
@@ -532,11 +563,21 @@ export const CustomersPage: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                <Input
-                  name="jurisdiction"
+                <Select
                   value={form.jurisdiction}
-                  onChange={handleFormChange}
-                />
+                  onValueChange={(value) =>
+                    handleSelectChange("jurisdiction", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select jurisdiction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mainland">Mainland</SelectItem>
+                    <SelectItem value="freezone">Freezone</SelectItem>
+                    <SelectItem value="offshore">Offshore</SelectItem>
+                  </SelectContent>
+                </Select>
                 {formErrors.jurisdiction && (
                   <span className="text-xs text-red-500">
                     {formErrors.jurisdiction}
@@ -675,7 +716,10 @@ export const CustomersPage: React.FC = () => {
                         ? "border-primary bg-primary/5"
                         : "hover:bg-gray-50"
                     }`}
-                    onClick={() => setSelectedCustomer(customer)}
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      fetchCustomerDocuments(customer._id);
+                    }}
                   >
                     <div className="flex items-center space-x-3">
                       <Avatar>
@@ -731,16 +775,7 @@ export const CustomersPage: React.FC = () => {
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link
-                          to={`/agent/chat?customer=${selectedCustomer._id}`}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Chat
-                        </Link>
-                      </Button>
-                    </div>
+                    <div className="flex items-center space-x-2"></div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -830,6 +865,166 @@ export const CustomersPage: React.FC = () => {
                             selectedCustomer.createdAt
                           ).toLocaleDateString()
                         : "N/A"}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Customer Documents */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Uploaded Documents
+                  </CardTitle>
+                  <CardDescription>
+                    Documents uploaded by the customer
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Debug info */}
+                    <div className="text-xs text-gray-500 mb-2">
+                      Total documents: {customerDocuments.length}
+                      {customerDocuments.length > 0 && (
+                        <div>
+                          Document types:{" "}
+                          {customerDocuments
+                            .map((doc) => doc.documentType)
+                            .join(", ")}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Local Proof */}
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">
+                        Local Proof
+                      </h4>
+                      {(() => {
+                        const localProofDoc = customerDocuments.find(
+                          (doc) => doc.documentType === "local-proof"
+                        );
+                        return localProofDoc ? (
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-blue-600" />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {localProofDoc.documentName || "Local Proof"}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(
+                                    localProofDoc.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                window.open(localProofDoc.fileUrl, "_blank")
+                              }
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
+                            No local proof uploaded
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Passport Photo */}
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">
+                        Passport Photo
+                      </h4>
+                      {(() => {
+                        const passportPhotoDoc = customerDocuments.find(
+                          (doc) => doc.documentType === "passport-photo"
+                        );
+                        return passportPhotoDoc ? (
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-green-600" />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {passportPhotoDoc.documentName ||
+                                    "Passport Photo"}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(
+                                    passportPhotoDoc.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                window.open(passportPhotoDoc.fileUrl, "_blank")
+                              }
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
+                            No passport photo uploaded
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Bank Statement */}
+                    <div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">
+                        Bank Statement
+                      </h4>
+                      {(() => {
+                        const bankStatementDoc = customerDocuments.find(
+                          (doc) => doc.documentType === "bank-statement"
+                        );
+                        return bankStatementDoc ? (
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-purple-600" />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {bankStatementDoc.documentName ||
+                                    "Bank Statement"}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(
+                                    bankStatementDoc.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                window.open(bankStatementDoc.fileUrl, "_blank")
+                              }
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
+                            No bank statement uploaded
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </CardContent>

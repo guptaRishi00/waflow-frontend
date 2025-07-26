@@ -26,9 +26,6 @@ const ApplicationCard = ({
         <span className="font-medium text-sm">
           {app.customer?.firstName} {app.customer?.lastName}
         </span>
-        <Badge variant="outline" className="text-xs">
-          {app._id}
-        </Badge>
       </div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground capitalize">

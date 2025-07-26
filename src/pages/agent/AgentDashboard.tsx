@@ -333,7 +333,7 @@ export const AgentDashboard: React.FC = () => {
       {/* Create Customer Modal */}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
         <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
@@ -352,70 +352,15 @@ export const AgentDashboard: React.FC = () => {
             <FileText className="h-10 w-10 text-secondary" />
           </CardContent>
         </Card>
-        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-lg text-muted-foreground">Completed</p>
-              <p className="text-3xl font-bold">
-                {stats.completedApplications}
-              </p>
-            </div>
-            <CheckCircle className="h-10 w-10 text-green-600" />
-          </CardContent>
-        </Card>
-        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-lg text-muted-foreground">Pending Tasks</p>
-              <p className="text-3xl font-bold">{stats.pendingTasks}</p>
-            </div>
-            <Clock className="h-10 w-10 text-orange-600" />
-          </CardContent>
-        </Card>
-        <Card className="shadow-lg rounded-xl hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-lg text-muted-foreground">Revenue (AED)</p>
-              <p className="text-3xl font-bold">
-                {stats.monthlyRevenue.toLocaleString()}
-              </p>
-            </div>
-            <DollarSign className="h-10 w-10 text-green-600" />
-          </CardContent>
-        </Card>
       </div>
 
       <hr className="my-8 border-gray-200" />
 
       {/* Visa Applications Section */}
-      <div className="mb-12">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Badge className="bg-blue-100 text-blue-800">Visa</Badge> Visa
-          Applications
-        </h2>
-        <Card className="shadow-lg rounded-xl">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">
-              All Submitted Visa Applications
-            </CardTitle>
-            <CardDescription>
-              Review, preview, and manage all submitted visa applications.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="relative z-0">
-            <VisaApplicationsList
-              key={visaApplications.length}
-              visaApplications={visaApplications}
-              loading={visaLoading}
-              onStatusUpdate={handleVisaStatusUpdate}
-            />
-          </CardContent>
-        </Card>
-      </div>
 
       <hr className="my-8 border-gray-200" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         {/* Active Applications */}
         <div>
           <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
@@ -490,49 +435,6 @@ export const AgentDashboard: React.FC = () => {
                             </Link>
                           </Button>
                           {/* Approve/Reject buttons for current step */}
-                          {currentStep &&
-                            [
-                              "Started",
-                              "Submitted for Review",
-                              "Awaiting Response",
-                            ].includes(currentStep.status) && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="flex items-center gap-1"
-                                  onClick={() =>
-                                    handleAppStatusUpdate(
-                                      app._id,
-                                      currentStep.stepName,
-                                      "Approved"
-                                    )
-                                  }
-                                  disabled={
-                                    actionLoading === app._id + "Approved"
-                                  }
-                                >
-                                  <CheckCircle2 className="h-4 w-4" /> Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="flex items-center gap-1"
-                                  onClick={() =>
-                                    handleAppStatusUpdate(
-                                      app._id,
-                                      currentStep.stepName,
-                                      "Declined"
-                                    )
-                                  }
-                                  disabled={
-                                    actionLoading === app._id + "Declined"
-                                  }
-                                >
-                                  <XCircle className="h-4 w-4" /> Reject
-                                </Button>
-                              </>
-                            )}
                         </div>
                       </div>
                     );
@@ -542,60 +444,6 @@ export const AgentDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-        {/* Recent Activity */}
-        <Card className="shadow-lg rounded-xl">
-          <CardHeader>
-            <CardTitle>Today's Tasks</CardTitle>
-            <CardDescription>Your priority tasks for today</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <Clock className="h-5 w-5 text-yellow-600" />
-                <div>
-                  <p className="font-medium text-yellow-900">
-                    Review KYC Documents
-                  </p>
-                  <p className="text-sm text-yellow-700">
-                    {
-                      applications.filter(
-                        (app) => app.status === "Waiting for Agent Review"
-                      ).length
-                    }{" "}
-                    customers waiting for verification
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <MessageSquare className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium text-blue-900">Customer Messages</p>
-                  <p className="text-sm text-blue-700">
-                    5 unread messages requiring response
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <FileText className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-900">
-                    License Applications
-                  </p>
-                  <p className="text-sm text-green-700">
-                    {
-                      applications.filter(
-                        (app) => app.status === "Ready for Processing"
-                      ).length
-                    }{" "}
-                    applications ready for submission
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <hr className="my-8 border-gray-200" />
@@ -644,45 +492,6 @@ export const AgentDashboard: React.FC = () => {
                         </Link>
                       </Button>
                       {/* Approve/Reject buttons for current step */}
-                      {currentStep &&
-                        [
-                          "Started",
-                          "Submitted for Review",
-                          "Awaiting Response",
-                        ].includes(currentStep.status) && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              className="flex items-center gap-1"
-                              onClick={() =>
-                                handleAppStatusUpdate(
-                                  app._id,
-                                  currentStep.stepName,
-                                  "Approved"
-                                )
-                              }
-                              disabled={actionLoading === app._id + "Approved"}
-                            >
-                              <CheckCircle2 className="h-4 w-4" /> Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="flex items-center gap-1"
-                              onClick={() =>
-                                handleAppStatusUpdate(
-                                  app._id,
-                                  currentStep.stepName,
-                                  "Declined"
-                                )
-                              }
-                              disabled={actionLoading === app._id + "Declined"}
-                            >
-                              <XCircle className="h-4 w-4" /> Reject
-                            </Button>
-                          </>
-                        )}
                     </div>
                   </div>
                 );
@@ -693,50 +502,6 @@ export const AgentDashboard: React.FC = () => {
       </Card>
 
       {/* Quick Actions */}
-      <Card className="mt-10 shadow-lg rounded-xl">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and shortcuts</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button asChild className="h-16 bg-primary hover:bg-primary/90">
-              <Link
-                to="/agent/applications"
-                className="flex flex-col items-center"
-              >
-                <FileText className="h-6 w-6 mb-1" />
-                <span className="text-sm">View Applications</span>
-              </Link>
-            </Button>
-
-            <Button asChild variant="outline" className="h-16">
-              <Link
-                to="/agent/customers"
-                className="flex flex-col items-center"
-              >
-                <Users className="h-6 w-6 mb-1" />
-                <span className="text-sm">Manage Customers</span>
-              </Link>
-            </Button>
-
-            <Button asChild variant="outline" className="h-16">
-              <Link to="/agent/chat" className="flex flex-col items-center">
-                <MessageSquare className="h-6 w-6 mb-1" />
-                <span className="text-sm">Customer Chat</span>
-              </Link>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-16 flex flex-col items-center"
-            >
-              <DollarSign className="h-6 w-6 mb-1" />
-              <span className="text-sm">Create Invoice</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

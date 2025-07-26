@@ -1,61 +1,152 @@
-
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ProgressTracker } from '@/components/ui/progress-tracker';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { FileText, MessageSquare, CreditCard, Calendar } from 'lucide-react';
-import { mockApplications, mockInvoices } from '@/lib/mock-data';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ProgressTracker } from "@/components/ui/progress-tracker";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  FileText,
+  MessageSquare,
+  CreditCard,
+  Calendar,
+  Loader2,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
+import axios from "axios";
+import { useToast } from "@/hooks/use-toast";
 
 export const CustomerDashboard: React.FC = () => {
-  const application = mockApplications[0];
-  const recentInvoices = mockInvoices.slice(0, 2);
+  const { user, token } = useSelector((state: RootState) => state.customerAuth);
+  const { toast } = useToast();
+  const [application, setApplication] = useState<any>(null);
+  const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real application data
+  useEffect(() => {
+    const fetchApplicationData = async () => {
+      if (!token || !user?.userId) return;
+
+      console.log("Fetching application data for user:", user.userId);
+      console.log("Token available:", !!token);
+
+      setLoading(true);
+      try {
+        // Fetch customer's application
+        const applicationResponse = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application/app/${user.userId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        console.log("Application response:", applicationResponse.data);
+
+        if (applicationResponse.data.data) {
+          setApplication(applicationResponse.data.data);
+        }
+
+        // Fetch invoices (if endpoint exists)
+        try {
+          const invoicesResponse = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/api/invoice/customer/${
+              user.userId
+            }`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setRecentInvoices(invoicesResponse.data.data?.slice(0, 2) || []);
+        } catch (error) {
+          console.log("No invoices endpoint available");
+          setRecentInvoices([]);
+        }
+      } catch (error: any) {
+        console.error("Error fetching application data:", error);
+        console.error("Error response:", error.response?.data);
+        console.error("Error status:", error.response?.status);
+        toast({
+          title: "Error",
+          description:
+            error.response?.data?.message || "Failed to load application data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApplicationData();
+  }, [token, user, toast]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Welcome back!</h1>
+          <p className="text-muted-foreground">
+            Track your UAE business registration progress
+          </p>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading your application data...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!application) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Welcome back!</h1>
+          <p className="text-muted-foreground">
+            Track your UAE business registration progress
+          </p>
+        </div>
+        <div className="text-center py-8">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-muted-foreground mb-2">
+            No Application Found
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            You haven't submitted any business registration applications yet.
+          </p>
+          <Button asChild>
+            <Link to="/customer/basic-info">Start Your Application</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-primary">Welcome back!</h1>
-        <p className="text-muted-foreground">Track your UAE business registration progress</p>
+        <p className="text-muted-foreground">
+          Track your UAE business registration progress
+        </p>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Application</p>
-                <p className="text-lg font-semibold">{application.id}</p>
-              </div>
-              <FileText className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Progress</p>
-                <p className="text-lg font-semibold">{application.currentStep}/8 Steps</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-xs font-bold text-primary">
-                  {Math.round((application.currentStep / 8) * 100)}%
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Status</p>
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  {application.status.replace('-', ' ')}
+                <Badge
+                  variant="secondary"
+                  className="bg-yellow-100 text-yellow-800"
+                >
+                  {application.status?.replace("-", " ") || "Pending"}
                 </Badge>
               </div>
               <Calendar className="h-8 w-8 text-secondary" />
@@ -68,7 +159,9 @@ export const CustomerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Business Type</p>
-                <p className="text-lg font-semibold capitalize">{application.businessType}</p>
+                <p className="text-lg font-semibold capitalize">
+                  {application.jurisdiction || "N/A"}
+                </p>
               </div>
               <div className="w-8 h-8 rounded-full waflow-gradient flex items-center justify-center">
                 <span className="text-xs font-bold text-white">UAE</span>
@@ -84,78 +177,14 @@ export const CustomerDashboard: React.FC = () => {
           <CardHeader>
             <CardTitle>Application Progress</CardTitle>
             <CardDescription>
-              Your business registration for <strong>{application.businessName}</strong>
+              Your business registration application
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ProgressTracker 
-              steps={application.steps} 
-              currentStep={application.currentStep}
+            <ProgressTracker
+              steps={application.steps || []}
+              currentStep={application.currentStep || 0}
             />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Invoices</CardTitle>
-            <CardDescription>Your payment history</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentInvoices.map((invoice) => (
-              <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">{invoice.notes}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(invoice.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">{invoice.amount} {invoice.currency}</p>
-                  <Badge 
-                    variant={invoice.status === 'paid' ? 'default' : 'secondary'}
-                    className={
-                      invoice.status === 'paid' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }
-                  >
-                    {invoice.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks and navigation</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button asChild className="w-full justify-start bg-primary hover:bg-primary/90">
-              <Link to="/customer/documents">
-                <FileText className="mr-2 h-4 w-4" />
-                Upload Documents
-              </Link>
-            </Button>
-            
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link to="/customer/chat">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Chat with Agent
-              </Link>
-            </Button>
-            
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link to="/customer/visa">
-                <CreditCard className="mr-2 h-4 w-4" />
-                Apply for Visa
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       </div>

@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Home,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,7 +36,12 @@ const managerNavItems = [
   { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Customers", url: "/manager/customers", icon: Users },
   { title: "Documents", url: "/manager/directory", icon: FolderOpen },
-  { title: "Settings", url: "/manager/settings", icon: Settings },
+  {
+    title: "Visa Applications",
+    url: "/manager/visa-applications",
+    icon: CreditCard,
+  },
+  // { title: "Settings", url: "/manager/settings", icon: Settings },
 ];
 
 export const ManagerSidebar: React.FC = () => {

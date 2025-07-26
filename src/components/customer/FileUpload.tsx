@@ -1,9 +1,8 @@
-
-import React, { useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Upload, Eye, Trash2, FileText, Image } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import React, { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Upload, Eye, Trash2, FileText, Image } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface FileUploadProps {
   label: string;
@@ -18,15 +17,26 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   file,
   onFileChange,
   disabled = false,
-  accept = '.jpg,.jpeg,.png,.pdf'
+  accept = ".jpg,.jpeg,.png,.pdf",
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Create preview for files when they change
+  React.useEffect(() => {
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreviewUrl(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [file]);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    
+
     if (!selectedFile) return;
 
     // Validate file size (5MB limit)
@@ -34,65 +44,63 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       toast({
         title: "File too large",
         description: "Please select a file smaller than 5MB",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     // Validate file type
-    const allowedTypes = accept.split(',').map(type => type.trim());
-    const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
+    const allowedTypes = accept.split(",").map((type) => type.trim());
+    const fileExtension =
+      "." + selectedFile.name.split(".").pop()?.toLowerCase();
     const mimeType = selectedFile.type;
-    
-    const isValidType = allowedTypes.some(type => 
-      type.startsWith('.') ? fileExtension === type : mimeType.startsWith(type.replace('*', ''))
+
+    const isValidType = allowedTypes.some((type) =>
+      type.startsWith(".")
+        ? fileExtension === type
+        : mimeType.startsWith(type.replace("*", ""))
     );
 
     if (!isValidType) {
       toast({
         title: "Invalid file type",
         description: `Please select a file with one of these extensions: ${accept}`,
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     onFileChange(selectedFile);
-
-    // Create preview for images
-    if (selectedFile.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => setPreviewUrl(e.target?.result as string);
-      reader.readAsDataURL(selectedFile);
-    } else {
-      setPreviewUrl(null);
-    }
   };
 
   const handleRemove = () => {
     onFileChange(undefined);
     setPreviewUrl(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const handlePreview = () => {
     if (file) {
       const url = URL.createObjectURL(file);
-      window.open(url, '_blank');
+      window.open(url, "_blank");
     }
   };
 
   const getFileIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    return extension === 'pdf' ? <FileText className="w-4 h-4" /> : <Image className="w-4 h-4" />;
+    const extension = fileName.split(".").pop()?.toLowerCase();
+    return extension === "pdf" ? (
+      <FileText className="w-4 h-4" />
+    ) : (
+      <Image className="w-4 h-4" />
+    );
   };
 
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium text-gray-700">{label}</Label>
-      
+
       {!disabled && !file && (
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-[#0b1d9b] transition-colors">
           <input
@@ -112,7 +120,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             Upload {label}
           </Button>
           <p className="text-xs text-gray-500 mt-1">
-            Max 5MB • {accept.replace(/\./g, '').toUpperCase()}
+            Max 5MB • {accept.replace(/\./g, "").toUpperCase()}
           </p>
         </div>
       )}
@@ -129,7 +137,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-1">
               <Button
                 type="button"
@@ -155,9 +163,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
           {previewUrl && (
             <div className="mt-3">
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
+              <img
+                src={previewUrl}
+                alt="Preview"
                 className="max-w-full h-32 object-cover rounded border"
               />
             </div>

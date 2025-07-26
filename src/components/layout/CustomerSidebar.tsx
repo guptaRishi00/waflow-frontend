@@ -38,7 +38,7 @@ const customerNavItems = [
   { title: "Application", url: "/customer/application", icon: AppWindowMac },
   { title: "Visa Application", url: "/customer/visa", icon: CreditCard },
   // { title: "Chat", url: "/customer/chat", icon: MessageSquare },
-  { title: "Settings", url: "/customer/settings", icon: Settings },
+  // { title: "Settings", url: "/customer/settings", icon: Settings },
 ];
 
 export const CustomerSidebar: React.FC = () => {

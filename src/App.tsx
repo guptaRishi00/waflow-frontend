@@ -39,6 +39,7 @@ import { AgentsPage } from "./pages/manager/AgentsPage";
 import { ManagerApplicationsPage } from "./pages/manager/ManagerApplicationsPage";
 import { ManagerCustomersPage } from "./pages/manager/ManagerCustomersPage";
 import { ManagerSettings } from "./pages/manager/ManagerSettings";
+import ManagerVisaApplicationsPage from "./pages/manager/ManagerVisaApplicationsPage";
 import { AuthInitializer } from "./lib/AuthInitializer";
 import ApplicationPage from "./pages/customer/ApplicationPage";
 
@@ -140,6 +141,10 @@ const AppRoutes = () => {
                 />
                 <Route path="customers" element={<ManagerCustomersPage />} />
                 <Route path="directory" element={<ManagerDirectoryPage />} />
+                <Route
+                  path="visa-applications"
+                  element={<ManagerVisaApplicationsPage />}
+                />
                 <Route path="settings" element={<ManagerSettings />} />
                 <Route
                   path="*"

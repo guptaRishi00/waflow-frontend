@@ -292,7 +292,7 @@ export const DirectoryPage: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Search customers..."
+                    placeholder="Search customers...1"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -383,15 +383,6 @@ export const DirectoryPage: React.FC = () => {
               <Card>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                        placeholder="Search by document type or name..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
                     <Select
                       value={selectedCategory}
                       onValueChange={setSelectedCategory}
@@ -407,20 +398,6 @@ export const DirectoryPage: React.FC = () => {
                         <SelectItem value="invoice">Invoice</SelectItem>
                         <SelectItem value="government">Government</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={selectedStatus}
-                      onValueChange={setSelectedStatus}
-                    >
-                      <SelectTrigger className="w-full md:w-48">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="uploaded">Uploaded</SelectItem>
-                        <SelectItem value="verified">Verified</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -481,14 +458,6 @@ export const DirectoryPage: React.FC = () => {
                               </span>
                               <span>
                                 <strong>App ID:</strong> {doc.documentName}
-                              </span>
-                              <span>
-                                <strong>Uploaded:</strong>{" "}
-                                {doc.uploadedAt
-                                  ? new Date(
-                                      doc.uploadedAt
-                                    ).toLocaleDateString()
-                                  : ""}
                               </span>
                             </div>
                           </div>

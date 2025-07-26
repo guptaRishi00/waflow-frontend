@@ -459,14 +459,6 @@ export const DirectoryPage: React.FC = () => {
                               <span>
                                 <strong>App ID:</strong> {doc.documentName}
                               </span>
-                              <span>
-                                <strong>Uploaded:</strong>{" "}
-                                {doc.uploadedAt
-                                  ? new Date(
-                                      doc.uploadedAt
-                                    ).toLocaleDateString()
-                                  : ""}
-                              </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -478,14 +470,7 @@ export const DirectoryPage: React.FC = () => {
                               <Eye className="w-4 h-4 mr-1" />
                               View
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {}}
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              Download
-                            </Button>
+
                             <Button
                               variant="outline"
                               size="sm"

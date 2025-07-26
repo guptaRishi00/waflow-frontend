@@ -132,9 +132,7 @@ const VisaApplicationsList: React.FC<VisaApplicationsListProps> = ({
                   variant="default"
                   className="flex items-center gap-1 px-4 py-2 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white disabled:bg-green-200"
                   onClick={() => onStatusUpdate(visa._id, "Approved")}
-                  disabled={
-                    visa.status === "Approved" || visa.status === "Rejected"
-                  }
+                  disabled={visa.status !== "Submitted for Review"}
                 >
                   <CheckCircle2 className="h-4 w-4" /> Approve
                 </Button>
@@ -143,7 +141,7 @@ const VisaApplicationsList: React.FC<VisaApplicationsListProps> = ({
                   variant="destructive"
                   className="flex items-center gap-1 px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white disabled:bg-red-200"
                   onClick={() => onStatusUpdate(visa._id, "Rejected")}
-                  disabled={visa.status === "Rejected"}
+                  disabled={visa.status !== "Submitted for Review"}
                 >
                   <XCircle className="h-4 w-4" /> Reject
                 </Button>

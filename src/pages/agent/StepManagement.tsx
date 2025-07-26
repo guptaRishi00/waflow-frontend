@@ -270,27 +270,6 @@ const StepManagement = ({
                 </div>
               )}
               {/* Agent Notes */}
-              <div className="space-y-2 mt-4">
-                <label htmlFor="agent-notes" className="text-sm font-medium">
-                  Agent Notes
-                </label>
-                <Textarea
-                  id="agent-notes"
-                  value={agentNotes}
-                  onChange={(e) => setAgentNotes(e.target.value)}
-                  placeholder="Add notes about this step or any updates for the customer..."
-                  rows={3}
-                  className="resize-none"
-                  disabled={loading}
-                />
-                <Button
-                  onClick={addNote}
-                  className="mt-2"
-                  disabled={loading || !agentNotes.trim()}
-                >
-                  Add Note
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -341,55 +320,6 @@ const StepManagement = ({
             </ScrollArea>
           </CardContent>
         </Card>
-
-        {/* Notes */}
-        {Array.isArray(localNotes) && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[220px]">
-                {localNotes.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                    <div className="font-medium">No notes yet.</div>
-                    <div className="text-xs">
-                      Add a note to keep track of important updates.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {localNotes.map((note: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-lg border bg-white shadow-sm flex flex-col gap-2"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <MessageSquare className="h-4 w-4 text-primary" />
-                          <span className="font-semibold text-sm text-primary">
-                            {note.addedBy?.fullName || note.author || "Agent"}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-auto">
-                            {note.timestamp
-                              ? new Date(note.timestamp).toLocaleString()
-                              : ""}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-800 whitespace-pre-line">
-                          {note.message}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

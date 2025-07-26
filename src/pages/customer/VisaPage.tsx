@@ -349,59 +349,99 @@ export const VisaPage: React.FC = () => {
         {/* List of Visa Members */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Your Visa Members</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Your Visa Members
+            </CardTitle>
             <CardDescription>
-              List of your submitted visa members.
+              Track the status of your submitted visa applications and their
+              documents
             </CardDescription>
           </CardHeader>
           <CardContent>
             {visaMembers.length === 0 ? (
-              <div className="text-muted-foreground">
-                No visa members found.
+              <div className="text-center py-8">
+                <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground text-lg font-medium">
+                  No visa members found
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Submit your first visa application above to see it here
+                </p>
               </div>
             ) : (
               <>
-                <ul className="list-disc ml-6">
+                <div className="space-y-4">
                   {paginatedMembers.map((member) => (
-                    <li key={member._id} className="mb-4">
-                      <div>ID: {member._id}</div>
-                      {member.memberId && (
-                        <div>Member ID: {member.memberId}</div>
-                      )}
-                      <div>Status: {member.status}</div>
-                      <div>
-                        Updated:{" "}
-                        {member.updatedAt
-                          ? new Date(member.updatedAt).toLocaleString()
-                          : "N/A"}
+                    <div
+                      key={member._id}
+                      className="border rounded-lg p-6 hover:shadow-md transition-shadow"
+                    >
+                      {/* Member Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">
+                              Member ID: {member.memberId || "N/A"}
+                            </h3>
+                          </div>
+                        </div>
                       </div>
-                      {/* List documents for this memberId */}
-                      <div className="mt-2 ml-4">
-                        <div className="font-semibold">Documents:</div>
-                        <ul className="list-disc ml-4">
-                          {documents.filter(
-                            (doc) =>
-                              doc.memberId && doc.memberId === member.memberId
-                          ).length === 0 ? (
-                            <li className="text-muted-foreground">
-                              No documents found for this member.
-                            </li>
-                          ) : (
-                            documents
+
+                      {/* Documents Section */}
+                      <div className="border-t pt-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="font-medium text-sm">
+                            Uploaded Documents
+                          </h4>
+                        </div>
+
+                        {documents.filter(
+                          (doc) =>
+                            doc.memberId && doc.memberId === member.memberId
+                        ).length === 0 ? (
+                          <div className="text-center py-4 bg-gray-50 rounded-lg">
+                            <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground text-sm">
+                              No documents uploaded yet
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {documents
                               .filter(
                                 (doc) =>
                                   doc.memberId &&
                                   doc.memberId === member.memberId
                               )
                               .map((doc) => (
-                                <li
+                                <div
                                   key={doc._id}
-                                  className="flex items-center gap-2"
+                                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                                 >
-                                  {doc.documentName || doc.fileName || doc._id}
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-blue-600" />
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {doc.documentName ||
+                                          doc.fileName ||
+                                          doc._id}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {new Date(
+                                          doc.createdAt
+                                        ).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
                                   {doc.fileUrl && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
                                       onClick={() =>
                                         window.open(
                                           doc.fileUrl,
@@ -409,41 +449,70 @@ export const VisaPage: React.FC = () => {
                                           "noopener,noreferrer"
                                         )
                                       }
-                                      className="ml-2 p-1 rounded hover:bg-gray-200"
-                                      title="Preview"
                                     >
-                                      <Eye className="w-4 h-4 text-blue-600" />
-                                    </button>
+                                      <Eye className="w-4 h-4 mr-1" />
+                                      View
+                                    </Button>
                                   )}
-                                </li>
-                              ))
-                          )}
-                        </ul>
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
-                <div className="flex gap-2 mt-4 items-center">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-2 py-1 border rounded"
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(p + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-2 py-1 border rounded"
-                  >
-                    Next
-                  </button>
                 </div>
+
+                {/* Enhanced Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                      {Math.min(currentPage * itemsPerPage, visaMembers.length)}{" "}
+                      of {visaMembers.length} members
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(p - 1, 1))
+                        }
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from(
+                          { length: totalPages },
+                          (_, i) => i + 1
+                        ).map((page) => (
+                          <Button
+                            key={page}
+                            variant={
+                              currentPage === page ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(p + 1, totalPages))
+                        }
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>

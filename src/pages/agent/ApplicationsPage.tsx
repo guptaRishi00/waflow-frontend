@@ -272,10 +272,6 @@ export const ApplicationsPage: React.FC = () => {
         {/* Applications List */}
         {applications.map((app, index) => (
           <div key={app._id ?? index} className="mb-2">
-            <div className="text-xs text-muted-foreground mb-1">
-              <strong>Customer ID:</strong> {app.customer?._id || "N/A"} |{" "}
-              <strong>Email:</strong> {app.customer?.email || "N/A"}
-            </div>
             <ApplicationCard
               app={app}
               selectedApp={selectedApp}
@@ -296,54 +292,11 @@ export const ApplicationsPage: React.FC = () => {
                     {selectedApp?.customer?.lastName}
                   </CardTitle>
                   <CardDescription>
-                    {selectedApp?._id} • {selectedApp?.customer?.email} •
-                    Created{" "}
+                    {selectedApp?.customer?.email} • Created{" "}
                     {selectedApp
                       ? new Date(selectedApp.createdAt).toLocaleDateString()
                       : ""}
                   </CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleViewApplication(selectedApp)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View Details
-                  </Button>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link
-                      to={
-                        selectedApp
-                          ? `/agent/customers/${selectedApp.customer?._id}`
-                          : "#"
-                      }
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Customer
-                    </Link>
-                  </Button>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link
-                      to={
-                        selectedApp
-                          ? `/agent/chat?application=${selectedApp._id}`
-                          : "#"
-                      }
-                    >
-                      <MessageSquare className="h-4 w-4 mr-1" />
-                      Chat
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCreateInvoice}
-                  >
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    Invoice
-                  </Button>
                 </div>
               </div>
             </CardHeader>

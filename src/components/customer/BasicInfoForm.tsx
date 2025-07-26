@@ -1,14 +1,24 @@
-
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { BasicInfoData } from '@/pages/customer/BasicInfoPage';
-import { FileUpload } from './FileUpload';
-import { User, MapPin, CreditCard, Building, Users } from 'lucide-react';
+import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { BasicInfoData } from "@/pages/customer/BasicInfoPage";
+import { FileUpload } from "./FileUpload";
+import { User, MapPin, CreditCard, Building, Users } from "lucide-react";
 
 interface BasicInfoFormProps {
   data: BasicInfoData;
@@ -21,12 +31,15 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   data,
   isEditing,
   onDataChange,
-  onFileUpload
+  onFileUpload,
 }) => {
-  const handleInputChange = (field: keyof BasicInfoData, value: string | string[]) => {
+  const handleInputChange = (
+    field: keyof BasicInfoData,
+    value: string | string[]
+  ) => {
     onDataChange({
       ...data,
-      [field]: value
+      [field]: value,
     });
   };
 
@@ -35,42 +48,44 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
     newOptions[index] = value;
     onDataChange({
       ...data,
-      companyNameOptions: newOptions
+      companyNameOptions: newOptions,
     });
   };
 
   const handleBusinessActivityChange = (activity: string) => {
     const currentActivities = data.businessActivity || [];
     const newActivities = currentActivities.includes(activity)
-      ? currentActivities.filter(a => a !== activity)
+      ? currentActivities.filter((a) => a !== activity)
       : [...currentActivities, activity];
-    
+
     onDataChange({
       ...data,
-      businessActivity: newActivities
+      businessActivity: newActivities,
     });
   };
 
   const renderField = (
     label: string,
     field: keyof BasicInfoData,
-    type: 'text' | 'email' | 'tel' | 'date' | 'textarea' | 'select' = 'text',
+    type: "text" | "email" | "tel" | "date" | "textarea" | "select" = "text",
     options?: string[]
   ) => {
     const value = data[field] as string;
-    
+
     if (!isEditing) {
       return (
         <div className="space-y-2">
           <Label className="text-sm font-medium text-gray-700">{label}</Label>
           <div className="p-3 bg-gray-50 rounded-md border">
-            {type === 'date' ? new Date(value).toLocaleDateString() : value || 'Not provided'}
+            {type === "date"
+              ? new Date(value).toLocaleDateString()
+              : value || "Not provided"}
           </div>
         </div>
       );
     }
 
-    if (type === 'textarea') {
+    if (type === "textarea") {
       return (
         <div className="space-y-2">
           <Label htmlFor={field}>{label}</Label>
@@ -84,17 +99,22 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
       );
     }
 
-    if (type === 'select' && options) {
+    if (type === "select" && options) {
       return (
         <div className="space-y-2">
           <Label htmlFor={field}>{label}</Label>
-          <Select value={value} onValueChange={(val) => handleInputChange(field, val)}>
+          <Select
+            value={value}
+            onValueChange={(val) => handleInputChange(field, val)}
+          >
             <SelectTrigger>
               <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {options.map(option => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
+              {options.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -118,8 +138,18 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   return (
     <Card>
       <CardContent className="p-6">
-        <Accordion type="multiple" defaultValue={["personal", "address", "passport", "financial", "company", "investor"]} className="space-y-4">
-          
+        <Accordion
+          type="multiple"
+          defaultValue={[
+            "personal",
+            "address",
+            "passport",
+            "financial",
+            "company",
+            "investor",
+          ]}
+          className="space-y-4"
+        >
           {/* Personal Details */}
           <AccordionItem value="personal" className="border rounded-lg">
             <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -130,12 +160,16 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Customer Name', 'customerName')}
-                {renderField('Nationality', 'nationality')}
-                {renderField('Date of Birth', 'dateOfBirth', 'date')}
-                {renderField('Gender', 'gender', 'select', ['Male', 'Female', 'Other'])}
-                {renderField('Phone Number', 'phoneNumber', 'tel')}
-                {renderField('Email Address', 'emailAddress', 'email')}
+                {renderField("Customer Name", "customerName")}
+                {renderField("Nationality", "nationality")}
+                {renderField("Date of Birth", "dateOfBirth", "date")}
+                {renderField("Gender", "gender", "select", [
+                  "Male",
+                  "Female",
+                  "Other",
+                ])}
+                {renderField("Phone Number", "phoneNumber", "tel")}
+                {renderField("Email Address", "emailAddress", "email")}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -150,14 +184,18 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Permanent Address', 'permanentAddress', 'textarea')}
-                {renderField('Country of Residence', 'countryOfResidence')}
-                {renderField('Local Address', 'localAddress', 'textarea')}
+                {renderField(
+                  "Permanent Address",
+                  "permanentAddress",
+                  "textarea"
+                )}
+
+                {renderField("Local Address", "localAddress", "textarea")}
                 <div className="md:col-span-1">
                   <FileUpload
                     label="Local Proof"
                     file={data.localProof}
-                    onFileChange={(file) => onFileUpload('localProof', file)}
+                    onFileChange={(file) => onFileUpload("localProof", file)}
                     disabled={!isEditing}
                   />
                 </div>
@@ -175,15 +213,11 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Passport Number', 'passportNumber')}
-                {renderField('Passport Expiry', 'passportExpiry', 'date')}
-                {renderField('Emirates ID', 'emiratesId')}
-                {renderField('Residence Visa', 'residenceVisa')}
                 <div className="md:col-span-2">
                   <FileUpload
                     label="Passport Photo"
                     file={data.passportPhoto}
-                    onFileChange={(file) => onFileUpload('passportPhoto', file)}
+                    onFileChange={(file) => onFileUpload("passportPhoto", file)}
                     disabled={!isEditing}
                     accept="image/*"
                   />
@@ -202,14 +236,14 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Source of Fund', 'sourceOfFund', 'textarea')}
-                {renderField('Quoted Price (AED)', 'quotedPrice')}
-                {renderField('Payment Details', 'paymentDetails', 'textarea')}
+                {renderField("Source of Fund", "sourceOfFund", "textarea")}
+                {renderField("Quoted Price (AED)", "quotedPrice")}
+                {renderField("Payment Details", "paymentDetails", "textarea")}
                 <div>
                   <FileUpload
                     label="Bank Statement"
                     file={data.bankStatement}
-                    onFileChange={(file) => onFileUpload('bankStatement', file)}
+                    onFileChange={(file) => onFileUpload("bankStatement", file)}
                     disabled={!isEditing}
                     accept=".pdf"
                   />
@@ -228,19 +262,37 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Company Type Preference', 'companyTypePreference', 'select', 
-                  ['Mainland', 'Free Zone', 'Offshore'])}
-                
+                {renderField(
+                  "Company Type Preference",
+                  "companyTypePreference",
+                  "select",
+                  ["Mainland", "Free Zone", "Offshore"]
+                )}
+
                 <div className="space-y-2">
                   <Label>Business Activity</Label>
                   {isEditing ? (
                     <div className="space-y-2">
-                      {['Trading', 'Consulting', 'Manufacturing', 'Services', 'Technology', 'Real Estate'].map(activity => (
-                        <label key={activity} className="flex items-center space-x-2">
+                      {[
+                        "Trading",
+                        "Consulting",
+                        "Manufacturing",
+                        "Services",
+                        "Technology",
+                        "Real Estate",
+                      ].map((activity) => (
+                        <label
+                          key={activity}
+                          className="flex items-center space-x-2"
+                        >
                           <input
                             type="checkbox"
-                            checked={data.businessActivity?.includes(activity) || false}
-                            onChange={() => handleBusinessActivityChange(activity)}
+                            checked={
+                              data.businessActivity?.includes(activity) || false
+                            }
+                            onChange={() =>
+                              handleBusinessActivityChange(activity)
+                            }
                             className="rounded border-gray-300"
                           />
                           <span className="text-sm">{activity}</span>
@@ -249,7 +301,7 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                     </div>
                   ) : (
                     <div className="p-3 bg-gray-50 rounded-md border">
-                      {data.businessActivity?.join(', ') || 'Not selected'}
+                      {data.businessActivity?.join(", ") || "Not selected"}
                     </div>
                   )}
                 </div>
@@ -262,20 +314,27 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                       {isEditing ? (
                         <Input
                           value={name}
-                          onChange={(e) => handleCompanyNameChange(index, e.target.value)}
+                          onChange={(e) =>
+                            handleCompanyNameChange(index, e.target.value)
+                          }
                           placeholder={`Company name option ${index + 1}`}
                         />
                       ) : (
-                        <div className="p-3 bg-gray-50 rounded-md border">{name || 'Not provided'}</div>
+                        <div className="p-3 bg-gray-50 rounded-md border">
+                          {name || "Not provided"}
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
 
-                {renderField('Office Type', 'officeType', 'select', 
-                  ['Shared Office', 'Private Office', 'Virtual Office', 'Warehouse'])}
-                {renderField('Company Jurisdiction', 'companyJurisdiction')}
-                {renderField('Final Company Name', 'finalCompanyName')}
+                {renderField("Office Type", "officeType", "select", [
+                  "Shared Office",
+                  "Private Office",
+                  "Virtual Office",
+                  "Warehouse",
+                ])}
+                {renderField("Company Jurisdiction", "companyJurisdiction")}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -290,15 +349,18 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('Investor Name', 'investorName')}
-                {renderField('Number of Investors', 'numberOfInvestors')}
-                {renderField('Investor Percentage (%)', 'investorPercentage')}
-                {renderField('Role', 'role', 'select', 
-                  ['Managing Director', 'Director', 'Partner', 'Shareholder', 'Manager'])}
+                {renderField("Number of Investors", "numberOfInvestors")}
+
+                {renderField("Role", "role", "select", [
+                  "Managing Director",
+                  "Director",
+                  "Partner",
+                  "Shareholder",
+                  "Manager",
+                ])}
               </div>
             </AccordionContent>
           </AccordionItem>
-
         </Accordion>
       </CardContent>
     </Card>

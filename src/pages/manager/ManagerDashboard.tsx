@@ -240,7 +240,7 @@ export const ManagerDashboard: React.FC = () => {
       </Dialog>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -276,49 +276,9 @@ export const ManagerDashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">
-                  {stats.completedApplications}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Pending Payments
-                </p>
-                <p className="text-2xl font-bold">{stats.pendingPayments}</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Notifications</p>
-                <p className="text-2xl font-bold">{stats.notifications}</p>
-              </div>
-              <Bell className="h-8 w-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Recent Agents */}
         <Card>
           <CardHeader>
@@ -362,43 +322,6 @@ export const ManagerDashboard: React.FC = () => {
         </Card>
 
         {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common management tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3">
-              <Button asChild className="h-12 bg-primary hover:bg-primary/90">
-                <Link to="/manager/agents" className="flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  <span>Manage Agents</span>
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline" className="h-12">
-                <Link to="/manager/applications" className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2" />
-                  <span>View All Applications</span>
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline" className="h-12">
-                <Link to="/manager/customers" className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  <span>View All Customers</span>
-                </Link>
-              </Button>
-
-              <Button asChild variant="outline" className="h-12">
-                <Link to="/manager/directory" className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2" />
-                  <span>Document Directory</span>
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
