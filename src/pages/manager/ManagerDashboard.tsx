@@ -34,15 +34,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 
 export const ManagerDashboard: React.FC = () => {
-  const stats = {
-    totalAgents: 5,
-    totalCustomers: 48,
-    activeApplications: 23,
-    completedApplications: 25,
-    pendingPayments: 8,
-    notifications: 12,
-  };
-
   const { toast } = useToast();
   const { token } = useSelector((state: RootState) => state.customerAuth);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -75,6 +66,8 @@ export const ManagerDashboard: React.FC = () => {
     };
     if (token) fetchAgents();
   }, [token]);
+
+  console.log("Recent Agents:", recentAgents.length);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -143,6 +136,47 @@ export const ManagerDashboard: React.FC = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAllCustomers(response.data.data || []);
+    };
+    fetchCustomer();
+  }, []);
+
+  const [allApplications, setAllApplications] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchApplication = async () => {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAllApplications(response.data.data || []);
+    };
+    fetchApplication();
+  }, []);
+
+  console.log("All Applications:", allApplications.length);
+
+  const stats = {
+    totalAgents: recentAgents.length,
+    totalCustomers: allCustomers.length,
+    activeApplications: allApplications.length,
+    completedApplications: 25,
+    pendingPayments: 8,
+    notifications: 12,
   };
 
   return (
@@ -269,7 +303,7 @@ export const ManagerDashboard: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Apps</p>
+                <p className="text-sm text-muted-foreground">All Application</p>
                 <p className="text-2xl font-bold">{stats.activeApplications}</p>
               </div>
               <FileText className="h-8 w-8 text-blue-600" />
