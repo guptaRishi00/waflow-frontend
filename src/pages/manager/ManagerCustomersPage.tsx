@@ -40,6 +40,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Mock customer data
 interface Customer {
@@ -154,6 +161,11 @@ export const ManagerCustomersPage: React.FC = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle Select field changes
+  const handleSelectChange = (name: string, value: string) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   // Validate required fields
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -197,7 +209,6 @@ export const ManagerCustomersPage: React.FC = () => {
     try {
       const payload = {
         ...form,
-        assignedAgentId: user?.userId,
       };
       await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/user/create-customer`,
@@ -234,6 +245,28 @@ export const ManagerCustomersPage: React.FC = () => {
       });
       // Refresh applications list after customer creation
       fetchApplications();
+      // Refresh customers list
+      const fetchData = async () => {
+        try {
+          const customersResponse = await fetch(
+            `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (customersResponse.ok) {
+            const customersData = await customersResponse.json();
+            setCustomers(customersData.data);
+          }
+        } catch (error) {
+          console.error("Error refreshing customers:", error);
+        }
+      };
+      fetchData();
     } catch (err: any) {
       toast({
         title: "Error",
@@ -551,11 +584,21 @@ export const ManagerCustomersPage: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                <Input
-                  name="jurisdiction"
+                <Select
                   value={form.jurisdiction}
-                  onChange={handleFormChange}
-                />
+                  onValueChange={(value) =>
+                    handleSelectChange("jurisdiction", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select jurisdiction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mainland">Mainland</SelectItem>
+                    <SelectItem value="freezone">Freezone</SelectItem>
+                    <SelectItem value="offshore">Offshore</SelectItem>
+                  </SelectContent>
+                </Select>
                 {formErrors.jurisdiction && (
                   <span className="text-xs text-red-500">
                     {formErrors.jurisdiction}
