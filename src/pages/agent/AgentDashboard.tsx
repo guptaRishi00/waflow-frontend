@@ -406,7 +406,7 @@ export const AgentDashboard: React.FC = () => {
                             {app.customer?.firstName} {app.customer?.lastName}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {app.customer?.email} • {app._id}
+                            {app.customer?.email}
                           </div>
                           <div className="text-xs mt-1">
                             {approvedSteps}/{totalSteps} steps approved
