@@ -53,15 +53,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           {getSidebar()}
         </div>
         <div className="flex-1 flex flex-col">
-          <header className="h-14 border-b bg-background flex items-center justify-between px-4">
-            <div className="flex items-center">
-              <SidebarTrigger />
-              <div className="ml-4">
-                <h1 className="font-semibold text-lg">{getPortalTitle()}</h1>
-              </div>
-            </div>
-            <NotificationBell />
-          </header>
+          {/* <header className="h-14 border-b bg-background flex items-center justify-between px-4"> */}
+          {/* <div className="flex items-center"> */}
+          {/* <SidebarTrigger /> */}
+          {/* <div className="ml-4"> */}
+          {/* <h1 className="font-semibold text-lg">{getPortalTitle()}</h1> */}
+          {/* </div> */}
+          {/* </div> */}
+          {/* <NotificationBell /> */}
+          {/* </header> */}
           <main className="flex-1 p-6 overflow-auto">{children}</main>
         </div>
       </div>

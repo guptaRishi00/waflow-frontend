@@ -169,7 +169,7 @@ export const AgentsPage: React.FC = () => {
     const fetchAgents = async () => {
       const response = await axios.get(
         // `${import.meta.env.VITE_API_URL}/api/user/agents`,
-        `http://localhost:5000/api/user/agents`,
+        `${import.meta.env.VITE_API_URL}/api/user/agents`,
         {
           headers: {
             "Content-Type": "application/json",

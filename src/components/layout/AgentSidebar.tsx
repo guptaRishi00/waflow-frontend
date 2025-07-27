@@ -78,9 +78,9 @@ export const AgentSidebar: React.FC = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">
+          {/* <SidebarGroupLabel className="text-sidebar-foreground/70">
             Navigation
-          </SidebarGroupLabel>
+          </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <SidebarMenu>
               {agentNavItems.map((item) => (
