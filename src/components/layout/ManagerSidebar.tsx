@@ -83,9 +83,9 @@ export const ManagerSidebar: React.FC = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">
+          {/* <SidebarGroupLabel className="text-sidebar-foreground/70">
             Management
-          </SidebarGroupLabel>
+          </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <SidebarMenu>
               {managerNavItems.map((item) => (

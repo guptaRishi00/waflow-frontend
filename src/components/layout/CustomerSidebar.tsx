@@ -80,9 +80,9 @@ export const CustomerSidebar: React.FC = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">
+          {/* <SidebarGroupLabel className="text-sidebar-foreground/70">
             Navigation
-          </SidebarGroupLabel>
+          </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <SidebarMenu>
               {customerNavItems.map((item) => (
