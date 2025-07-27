@@ -101,6 +101,8 @@ export const AgentsPage: React.FC = () => {
   const [agents, setAgents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
@@ -167,22 +169,72 @@ export const AgentsPage: React.FC = () => {
 
   useEffect(() => {
     const fetchAgents = async () => {
-      const response = await axios.get(
-        // `${import.meta.env.VITE_API_URL}/api/user/agents`,
-        `${import.meta.env.VITE_API_URL}/api/user/agents`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      try {
+        setIsLoading(true);
+        setError("");
+        console.log("Fetching agents...");
+        console.log("Token:", token);
+        console.log("User:", user);
+        console.log("User role:", user?.role);
+        console.log("API URL:", import.meta.env.VITE_BASE_URL);
 
-      console.log("Fetched agents:", response.data);
-      setAgents(response.data.data);
+        const baseUrl =
+          import.meta.env.VITE_BASE_URL || "http://localhost:5000";
+        console.log("Using base URL:", baseUrl);
+
+        const response = await axios.get(
+          // `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
+          `${baseUrl}/api/user/agents`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        console.log("Fetched agents:", response.data);
+        setAgents(response.data.data);
+      } catch (error) {
+        console.error("Error fetching agents:", error);
+        console.error("Error response:", error.response?.data);
+        console.error("Error status:", error.response?.status);
+
+        let errorMessage = "Failed to fetch agents";
+
+        if (error.response?.status === 403) {
+          console.error("Access denied - User role may not have permission");
+          console.error("Required roles: admin, manager");
+          console.error("Current user role:", user?.role);
+          errorMessage =
+            "Access denied. You don't have permission to view agents.";
+        } else if (error.response?.status === 401) {
+          console.error("Unauthorized - Token may be invalid or expired");
+          errorMessage = "Unauthorized. Please log in again.";
+        } else if (!error.response) {
+          console.error("Network error - Backend server may not be running");
+          errorMessage =
+            "Network error. Please check if the backend server is running.";
+        }
+
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    fetchAgents();
-  }, []);
+
+    if (token) {
+      if (user?.role === "admin" || user?.role === "manager") {
+        fetchAgents();
+      } else {
+        console.error("User does not have permission to view agents");
+        console.error("Required roles: admin, manager");
+        console.error("Current user role:", user?.role);
+      }
+    } else {
+      console.error("No token available");
+    }
+  }, [token, user]);
 
   console.log("Agents data:", agents);
 
@@ -296,116 +348,146 @@ export const AgentsPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Agent</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Customers</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {agents.map((agent) => (
-                <TableRow key={agent._id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{agent.fullName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {agent.email}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <p className="text-sm flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {agent.phoneNumber}
-                      </p>
-                      <p className="text-sm flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {agent.email}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="bg-blue-50 text-blue-700"
-                    >
-                      {agent.status} assigned
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        agent.status === "active" ? "default" : "secondary"
-                      }
-                      className={
-                        agent.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }
-                    >
-                      {agent.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(agent.createdAt).toLocaleDateString()}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedAgent(agent);
-                            setIsViewModalOpen(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedAgent(agent);
-                            setIsEditModalOpen(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleToggleStatus(agent)}
-                        >
-                          {agent.status === "active" ? (
-                            <>
-                              <UserX className="h-4 w-4 mr-2" />
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Activate
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading agents...</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-red-600 mb-2">{error}</p>
+                <p className="text-sm text-muted-foreground">
+                  Please check the browser console for more details.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!isLoading && !error && agents.length === 0 && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-muted-foreground">No agents found.</p>
+              </div>
+            </div>
+          )}
+
+          {!isLoading && !error && agents.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Customers</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {agents.map((agent) => (
+                  <TableRow key={agent._id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{agent.fullName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {agent.email}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="text-sm flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {agent.phoneNumber}
+                        </p>
+                        <p className="text-sm flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {agent.email}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-700"
+                      >
+                        {agent.status} assigned
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          agent.status === "active" ? "default" : "secondary"
+                        }
+                        className={
+                          agent.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }
+                      >
+                        {agent.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(agent.createdAt).toLocaleDateString()}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedAgent(agent);
+                              setIsViewModalOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedAgent(agent);
+                              setIsEditModalOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleStatus(agent)}
+                          >
+                            {agent.status === "active" ? (
+                              <>
+                                <UserX className="h-4 w-4 mr-2" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
