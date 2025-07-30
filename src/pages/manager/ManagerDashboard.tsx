@@ -8,7 +8,15 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Shield, FileText, Bell, TrendingUp, Clock } from "lucide-react";
+import {
+  Users,
+  Shield,
+  FileText,
+  Bell,
+  TrendingUp,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Dialog,
@@ -30,6 +38,7 @@ export const ManagerDashboard: React.FC = () => {
   const { token } = useSelector((state: RootState) => state.customerAuth);
   // Move recent agents to state
   const [recentAgents, setRecentAgents] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch agents from backend on mount
   useEffect(() => {
@@ -69,8 +78,8 @@ export const ManagerDashboard: React.FC = () => {
 
   const [allApplications, setAllApplications] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchApplication = async () => {
+  const fetchApplications = async () => {
+    try {
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/api/application`,
         {
@@ -78,19 +87,67 @@ export const ManagerDashboard: React.FC = () => {
         }
       );
       setAllApplications(response.data.data || []);
-    };
-    fetchApplication();
-  }, []);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchApplications();
+    }
+  }, [token]);
+
+  // Refresh applications every 30 seconds to get latest status updates
+  useEffect(() => {
+    if (token) {
+      const interval = setInterval(() => {
+        fetchApplications();
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [token]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchApplications();
+      toast({
+        title: "Refreshed",
+        description: "Dashboard data has been updated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh dashboard data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   console.log("All Applications:", allApplications.length);
+  console.log("Applications data:", allApplications);
+
+  // Calculate completed applications
+  const completedApplications = allApplications.filter(
+    (app) => app.status === "Completed"
+  ).length;
+
+  console.log("Completed applications count:", completedApplications);
+  console.log(
+    "Application statuses:",
+    allApplications.map((app) => app.status)
+  );
 
   const stats = {
     totalAgents: recentAgents.length,
     totalCustomers: allCustomers.length,
     activeApplications: allApplications.length,
-    completedApplications: 25,
-    pendingPayments: 8,
-    notifications: 12,
+    completedApplications: completedApplications,
+    pendingPayments: 0, // Static value as requested
   };
 
   return (
@@ -102,10 +159,21 @@ export const ManagerDashboard: React.FC = () => {
             Overview of all operations and performance
           </p>
         </div>
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+          />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -134,10 +202,38 @@ export const ManagerDashboard: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">All Application</p>
+                <p className="text-sm text-muted-foreground">
+                  All Applications
+                </p>
                 <p className="text-2xl font-bold">{stats.activeApplications}</p>
               </div>
               <FileText className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">
+                  {stats.completedApplications}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Pending Payment</p>
+                <p className="text-2xl font-bold">{stats.pendingPayments}</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>

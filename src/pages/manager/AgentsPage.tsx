@@ -46,61 +46,17 @@ import {
   Phone,
   Mail,
   Calendar,
-  Users,
-  FileText,
-  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ApplicationDetailsModal } from "@/components/common/ApplicationDetailsModal";
-import { mockApplications } from "@/lib/mock-data";
-import type { Application } from "@/types";
+
 import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
-import { useNavigate } from "react-router-dom";
-
-// Mock agents data
-const mockAgents = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@waflow.com",
-    phone: "+971-50-234-5678",
-    customersAssigned: 12,
-    status: "active",
-    createdAt: "2024-01-15",
-    applications: ["APP-2024-001", "APP-2024-003", "APP-2024-007"],
-    completionRate: 95,
-    avgResponseTime: "2.3 hours",
-  },
-  {
-    id: "2",
-    name: "Ahmed Al Mahmoud",
-    email: "ahmed.mahmoud@waflow.com",
-    phone: "+971-55-345-6789",
-    customersAssigned: 8,
-    status: "active",
-    createdAt: "2024-02-20",
-    applications: ["APP-2024-002", "APP-2024-005"],
-    completionRate: 88,
-    avgResponseTime: "1.8 hours",
-  },
-  {
-    id: "3",
-    name: "Lisa Chen",
-    email: "lisa.chen@waflow.com",
-    phone: "+971-52-456-7890",
-    customersAssigned: 15,
-    status: "inactive",
-    createdAt: "2023-11-10",
-    applications: ["APP-2024-004", "APP-2024-006", "APP-2024-008"],
-    completionRate: 92,
-    avgResponseTime: "3.1 hours",
-  },
-];
 
 export const AgentsPage: React.FC = () => {
-  const navigate = useNavigate();
   const [agents, setAgents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -109,9 +65,12 @@ export const AgentsPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
-  const [selectedApplication, setSelectedApplication] =
-    useState<Application | null>(null);
-  const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [newAgent, setNewAgent] = useState({
     name: "",
     email: "",
@@ -121,6 +80,22 @@ export const AgentsPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const [customers, setCustomers] = useState([]);
+  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
+
+  const [editFormData, setEditFormData] = useState({
+    fullName: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+  });
+  const [editFormErrors, setEditFormErrors] = useState<{
+    [key: string]: string;
+  }>({});
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [agentToToggle, setAgentToToggle] = useState<any>(null);
 
   // Password strength validation
   const checkPasswordStrength = (password: string) => {
@@ -176,31 +151,124 @@ export const AgentsPage: React.FC = () => {
     setFormErrors({});
   };
 
-  const handleEditAgent = () => {
-    toast({
-      title: "Agent Updated",
-      description: `Agent ${selectedAgent?.name} has been updated successfully.`,
-    });
-    setIsEditModalOpen(false);
+  const handleEditAgent = async () => {
+    if (!selectedAgent || !token) return;
+
+    // Validate form
+    const errors: { [key: string]: string } = {};
+    if (!editFormData.fullName) errors.fullName = "Full name is required";
+    if (!editFormData.phoneNumber)
+      errors.phoneNumber = "Phone number is required";
+    if (editFormData.password && editFormData.password.length < 8) {
+      errors.password = "Password must be at least 8 characters";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const updateData: any = {
+        fullName: editFormData.fullName,
+        phoneNumber: editFormData.phoneNumber,
+      };
+
+      // Only include password if it's provided
+      if (editFormData.password) {
+        updateData.password = editFormData.password;
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agent/${selectedAgent._id}`,
+        updateData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      toast({
+        title: "Success",
+        description: "Agent updated successfully!",
+      });
+
+      // Update the agents list with the new data
+      setAgents((prevAgents) =>
+        prevAgents.map((agent) =>
+          agent._id === selectedAgent._id
+            ? { ...agent, ...response.data.data }
+            : agent
+        )
+      );
+
+      setIsEditModalOpen(false);
+      setEditFormData({
+        fullName: "",
+        email: "",
+        phoneNumber: "",
+        password: "",
+      });
+      setEditFormErrors({});
+      setShowEditPassword(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to update agent",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleToggleStatus = (agent: any) => {
-    const newStatus = agent.status === "active" ? "inactive" : "active";
-    toast({
-      title: "Status Updated",
-      description: `Agent ${agent.name} has been ${
-        newStatus === "active" ? "activated" : "deactivated"
-      }.`,
-    });
+    setAgentToToggle(agent);
+    setIsStatusModalOpen(true);
   };
 
-  const handleViewApplication = (applicationId: string) => {
-    const application = mockApplications.find(
-      (app) => app.id === applicationId
-    );
-    if (application) {
-      setSelectedApplication(application);
-      setIsApplicationModalOpen(true);
+  const confirmToggleStatus = async () => {
+    if (!agentToToggle || !token) return;
+
+    const newStatus = agentToToggle.status === "active" ? "inactive" : "active";
+
+    setIsUpdating(true);
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agent/${agentToToggle._id}`,
+        { status: newStatus },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Update the agents list with the new status
+      setAgents((prevAgents) =>
+        prevAgents.map((agent) =>
+          agent._id === agentToToggle._id
+            ? { ...agent, status: newStatus }
+            : agent
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `Agent ${agentToToggle.fullName} has been ${
+          newStatus === "active" ? "activated" : "deactivated"
+        } successfully.`,
+      });
+
+      setIsStatusModalOpen(false);
+      setAgentToToggle(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description:
+          error?.response?.data?.message || "Failed to update agent status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -302,7 +370,82 @@ export const AgentsPage: React.FC = () => {
     }
   }, [token, user]);
 
+  // Fetch customers on page load for the table
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!token) return;
+      setIsCustomersLoading(true);
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setCustomers(response.data.data || []);
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to load customers.",
+          variant: "destructive",
+        });
+        setCustomers([]);
+      } finally {
+        setIsCustomersLoading(false);
+      }
+    };
+    fetchCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Update edit form when selected agent changes
+  useEffect(() => {
+    if (selectedAgent && isEditModalOpen) {
+      setEditFormData({
+        fullName: selectedAgent.fullName || "",
+        email: selectedAgent.email || "",
+        phoneNumber: selectedAgent.phoneNumber || "",
+        password: "",
+      });
+      setEditFormErrors({});
+      setShowEditPassword(false);
+    }
+  }, [selectedAgent, isEditModalOpen]);
+
   console.log("Agents data:", agents);
+
+  // Pagination logic
+  const filteredAgents = agents.filter(
+    (agent) =>
+      agent.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      agent.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Sort agents by creation date (newest first)
+  const sortedAgents = filteredAgents.sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  });
+
+  const totalPages = Math.ceil(sortedAgents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAgents = sortedAgents.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -522,6 +665,39 @@ export const AgentsPage: React.FC = () => {
       </div>
 
       {/* Search */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search agents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              {itemsPerPage} items per page
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("5")}>
+              5 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("10")}>
+              10 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("20")}>
+              20 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("50")}>
+              50 items
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Agents Table */}
       <Card>
@@ -560,7 +736,20 @@ export const AgentsPage: React.FC = () => {
             </div>
           )}
 
-          {!isLoading && !error && agents.length > 0 && (
+          {!isLoading &&
+            !error &&
+            agents.length > 0 &&
+            filteredAgents.length === 0 && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <p className="text-muted-foreground">
+                    No agents match your search criteria.
+                  </p>
+                </div>
+              </div>
+            )}
+
+          {!isLoading && !error && filteredAgents.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -573,7 +762,7 @@ export const AgentsPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {agents.map((agent) => (
+                {paginatedAgents.map((agent) => (
                   <TableRow key={agent._id}>
                     <TableCell>
                       <div>
@@ -600,7 +789,13 @@ export const AgentsPage: React.FC = () => {
                         variant="outline"
                         className="bg-blue-50 text-blue-700"
                       >
-                        {agent.status} assigned
+                        {isCustomersLoading
+                          ? "Loading..."
+                          : `${
+                              customers.filter(
+                                (c) => c.assignedAgentId === agent._id
+                              ).length
+                            } assigned`}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -633,7 +828,8 @@ export const AgentsPage: React.FC = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={() => {
-                              navigate(`/manager/agents/${agent._id}`);
+                              setSelectedAgent(agent);
+                              setIsViewModalOpen(true);
                             }}
                           >
                             <Eye className="h-4 w-4 mr-2" />
@@ -674,6 +870,36 @@ export const AgentsPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to{" "}
+            {Math.min(endIndex, filteredAgents.length)} of{" "}
+            {filteredAgents.length} results
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Edit Agent Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent>
@@ -686,36 +912,99 @@ export const AgentsPage: React.FC = () => {
           {selectedAgent && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="edit-name">Full Name</Label>
+                <Label htmlFor="edit-name">Full Name *</Label>
                 <Input
                   id="edit-name"
-                  defaultValue={selectedAgent.name}
+                  value={editFormData.fullName}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      fullName: e.target.value,
+                    })
+                  }
                   placeholder="Enter agent's full name"
+                  className={editFormErrors.fullName ? "border-red-500" : ""}
                 />
+                {editFormErrors.fullName && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.fullName}
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="edit-email">Email Address</Label>
                 <Input
                   id="edit-email"
                   type="email"
-                  defaultValue={selectedAgent.email}
+                  value={editFormData.email}
                   disabled
-                  className="bg-gray-100"
+                  className="bg-gray-100 cursor-not-allowed"
+                  placeholder="Email address (read-only)"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email address cannot be changed
+                </p>
               </div>
               <div>
-                <Label htmlFor="edit-phone">Phone Number</Label>
+                <Label htmlFor="edit-phone">Phone Number *</Label>
                 <Input
                   id="edit-phone"
-                  defaultValue={selectedAgent.phone}
+                  value={editFormData.phoneNumber}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      phoneNumber: e.target.value,
+                    })
+                  }
                   placeholder="+971-XX-XXX-XXXX"
+                  className={editFormErrors.phoneNumber ? "border-red-500" : ""}
                 />
+                {editFormErrors.phoneNumber && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.phoneNumber}
+                  </p>
+                )}
               </div>
               <div>
-                <Label>Reset Password</Label>
-                <Button variant="outline" className="w-full mt-2">
-                  Send Password Reset Email
-                </Button>
+                <Label htmlFor="edit-password">New Password (Optional)</Label>
+                <div className="relative">
+                  <Input
+                    id="edit-password"
+                    type={showEditPassword ? "text" : "password"}
+                    value={editFormData.password}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        password: e.target.value,
+                      })
+                    }
+                    placeholder="Leave blank to keep current password"
+                    className={`pr-10 ${
+                      editFormErrors.password ? "border-red-500" : ""
+                    }`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                  >
+                    {showEditPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {editFormErrors.password && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.password}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leave blank to keep the current password
+                </p>
               </div>
             </div>
           )}
@@ -725,11 +1014,65 @@ export const AgentsPage: React.FC = () => {
             </Button>
             <Button
               onClick={handleEditAgent}
+              disabled={isUpdating}
               className="bg-primary hover:bg-primary/90"
             >
-              Update Agent
+              {isUpdating ? "Updating..." : "Update Agent"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Confirmation Modal */}
+      <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
+        <DialogContent>
+          {agentToToggle && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {agentToToggle.status === "active"
+                    ? "Deactivate Agent"
+                    : "Activate Agent"}
+                </DialogTitle>
+                <DialogDescription>
+                  {agentToToggle.status === "active"
+                    ? `Are you sure you want to deactivate ${agentToToggle.fullName}? This will prevent them from accessing the system.`
+                    : `Are you sure you want to activate ${agentToToggle.fullName}? This will restore their access to the system.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsStatusModalOpen(false);
+                    setAgentToToggle(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmToggleStatus}
+                  disabled={isUpdating}
+                  variant={
+                    agentToToggle.status === "active"
+                      ? "destructive"
+                      : "default"
+                  }
+                  className={
+                    agentToToggle.status === "active"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : ""
+                  }
+                >
+                  {isUpdating
+                    ? "Updating..."
+                    : agentToToggle.status === "active"
+                    ? "Deactivate"
+                    : "Activate"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -738,22 +1081,25 @@ export const AgentsPage: React.FC = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Agent Profile</DialogTitle>
+            <DialogDescription>
+              View agent information and performance details
+            </DialogDescription>
           </DialogHeader>
           {selectedAgent && (
             <div className="space-y-6">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">Name</Label>
-                  <p className="font-medium">{selectedAgent.name}</p>
+                  <Label className="text-muted-foreground">Full Name</Label>
+                  <p className="font-medium">{selectedAgent.fullName}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Email</Label>
                   <p className="font-medium">{selectedAgent.email}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Phone</Label>
-                  <p className="font-medium">{selectedAgent.phone}</p>
+                  <Label className="text-muted-foreground">Phone Number</Label>
+                  <p className="font-medium">{selectedAgent.phoneNumber}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
@@ -772,122 +1118,29 @@ export const AgentsPage: React.FC = () => {
                     {selectedAgent.status}
                   </Badge>
                 </div>
-              </div>
-
-              {/* Performance Summary */}
-              <div>
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Performance Summary
-                </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-primary">
-                          {selectedAgent.customersAssigned}
-                        </p>
-                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-                          <Users className="h-3 w-3" />
-                          Customers
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">
-                          {selectedAgent.completionRate}%
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Completion Rate
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">
-                          {selectedAgent.avgResponseTime}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Avg Response
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <div>
+                  <Label className="text-muted-foreground">Member Since</Label>
+                  <p className="font-medium">
+                    {new Date(selectedAgent.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
-              </div>
-
-              {/* Applications Handled */}
-              <div>
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Applications Handled ({selectedAgent.applications.length})
-                </h3>
-                <div className="space-y-2">
-                  {selectedAgent.applications.map((appId: string) => {
-                    const application = mockApplications.find(
-                      (app) => app.id === appId
-                    );
-                    return application ? (
-                      <div
-                        key={appId}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {application.businessName}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {appId} • {application.businessType}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              application.status === "under-review"
-                                ? "secondary"
-                                : "default"
-                            }
-                            className={
-                              application.status === "under-review"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : ""
-                            }
-                          >
-                            {application.status.replace("-", " ")}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewApplication(appId)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null;
-                  })}
+                <div>
+                  <Label className="text-muted-foreground">
+                    Customers Assigned
+                  </Label>
+                  <p className="font-medium">
+                    {isCustomersLoading
+                      ? "Loading..."
+                      : customers.filter(
+                          (c) => c.assignedAgentId === selectedAgent._id
+                        ).length}
+                  </p>
                 </div>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Application Details Modal */}
-      <ApplicationDetailsModal
-        application={selectedApplication}
-        isOpen={isApplicationModalOpen}
-        onClose={() => {
-          setIsApplicationModalOpen(false);
-          setSelectedApplication(null);
-        }}
-      />
     </div>
   );
 };
