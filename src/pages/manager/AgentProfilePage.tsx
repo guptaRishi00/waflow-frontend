@@ -48,16 +48,16 @@ export const AgentProfilePage: React.FC = () => {
   useEffect(() => {
     const fetchAgent = async () => {
       if (!agentId || !token) return;
-      
+
       try {
         setIsLoading(true);
         const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/agents/${agentId}`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/agent/${agentId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        
+
         const agentData = response.data.data;
         setAgent(agentData);
         setFormData({
@@ -82,9 +82,9 @@ export const AgentProfilePage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -110,16 +110,21 @@ export const AgentProfilePage: React.FC = () => {
       });
 
       // Update local state
-      setAgent(prev => prev ? {
-        ...prev,
-        name: formData.name,
-        phone: formData.phone,
-      } : null);
-
+      setAgent((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: formData.name,
+              phone: formData.phone,
+            }
+          : null
+      );
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error?.response?.data?.message || "Failed to update agent information.",
+        description:
+          error?.response?.data?.message ||
+          "Failed to update agent information.",
         variant: "destructive",
       });
     } finally {
@@ -133,7 +138,9 @@ export const AgentProfilePage: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-            <p className="text-muted-foreground">Loading agent information...</p>
+            <p className="text-muted-foreground">
+              Loading agent information...
+            </p>
           </div>
         </div>
       </div>
@@ -146,7 +153,10 @@ export const AgentProfilePage: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-muted-foreground">Agent not found.</p>
-            <Button onClick={() => navigate("/manager/agents")} className="mt-2">
+            <Button
+              onClick={() => navigate("/manager/agents")}
+              className="mt-2"
+            >
               Back to Agents
             </Button>
           </div>
@@ -232,7 +242,9 @@ export const AgentProfilePage: React.FC = () => {
                 <Label>Status</Label>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge
-                    variant={agent.status === "active" ? "default" : "secondary"}
+                    variant={
+                      agent.status === "active" ? "default" : "secondary"
+                    }
                     className={
                       agent.status === "active"
                         ? "bg-green-100 text-green-800"
@@ -251,9 +263,7 @@ export const AgentProfilePage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Agent Statistics</CardTitle>
-            <CardDescription>
-              Performance overview
-            </CardDescription>
+            <CardDescription>Performance overview</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
@@ -268,17 +278,13 @@ export const AgentProfilePage: React.FC = () => {
               <p className="text-2xl font-bold text-green-600">
                 {agent.completionRate || 0}%
               </p>
-              <p className="text-sm text-muted-foreground">
-                Completion Rate
-              </p>
+              <p className="text-sm text-muted-foreground">Completion Rate</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-600">
                 {agent.avgResponseTime || "N/A"}
               </p>
-              <p className="text-sm text-muted-foreground">
-                Avg Response Time
-              </p>
+              <p className="text-sm text-muted-foreground">Avg Response Time</p>
             </div>
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
@@ -290,4 +296,4 @@ export const AgentProfilePage: React.FC = () => {
       </div>
     </div>
   );
-}; 
+};
