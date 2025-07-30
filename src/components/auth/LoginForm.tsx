@@ -185,7 +185,14 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">{/* Signup switch removed */}</div>
+          <div className="mt-6 text-center">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-primary hover:text-primary/80 underline"
+            >
+              Forgot Password?
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

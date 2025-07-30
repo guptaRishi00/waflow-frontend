@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Eye,
+  EyeOff,
   Search,
   Mail,
   Phone,
@@ -152,6 +153,25 @@ export const ManagerCustomersPage: React.FC = () => {
     password: "",
   });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Password strength validation
+  const checkPasswordStrength = (password: string) => {
+    const hasCapital = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasMinLength = password.length >= 8;
+
+    return {
+      hasCapital,
+      hasNumber,
+      hasSpecial,
+      hasMinLength,
+      isStrong: hasCapital && hasNumber && hasSpecial && hasMinLength,
+    };
+  };
+
+  const passwordStrength = checkPasswordStrength(form.password);
 
   // Handle form field changes
   const handleFormChange = (
@@ -193,6 +213,13 @@ export const ManagerCustomersPage: React.FC = () => {
         errors[field] = "Required";
       }
     });
+
+    // Check password strength
+    if (form.password && !passwordStrength.isStrong) {
+      errors.password =
+        "Password must be strong (capital letter, number, special character, min 8 chars)";
+    }
+
     return errors;
   };
 
@@ -545,11 +572,22 @@ export const ManagerCustomersPage: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="gender">Gender</Label>
-                <Input
-                  name="gender"
+                <Select
                   value={form.gender}
-                  onChange={handleFormChange}
-                />
+                  onValueChange={(value) => handleSelectChange("gender", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer-not-to-say">
+                      Prefer not to say
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
                 {formErrors.gender && (
                   <span className="text-xs text-red-500">
                     {formErrors.gender}
@@ -672,12 +710,107 @@ export const ManagerCustomersPage: React.FC = () => {
               </div>
               <div className="col-span-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleFormChange}
-                />
+                <div className="relative">
+                  <Input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={handleFormChange}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {/* Password Strength Indicator */}
+                {form.password && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Password strength requirements:
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasCapital
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasCapital
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Capital letter (A-Z)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasNumber
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasNumber
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Number (0-9)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasSpecial
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasSpecial
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Special character (!@#$%^&*)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasMinLength
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasMinLength
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Minimum 8 characters
+                      </div>
+                    </div>
+                    {passwordStrength.isStrong && (
+                      <div className="text-xs text-green-600 font-medium">
+                        ✓ Password is strong!
+                      </div>
+                    )}
+                  </div>
+                )}
                 {formErrors.password && (
                   <span className="text-xs text-red-500">
                     {formErrors.password}

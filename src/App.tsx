@@ -13,6 +13,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { AuthPage } from "./pages/auth/AuthPage";
 import { StartRegistrationPage } from "./pages/StartRegistrationPage";
+import ForgotPassword from "./components/auth/ForgotPassword.tsx";
+import ResetPassword from "./components/auth/ResetPassword.tsx";
 
 // Customer Pages
 import { CustomerDashboard } from "./pages/customer/CustomerDashboard";
@@ -40,6 +42,7 @@ import { ManagerApplicationsPage } from "./pages/manager/ManagerApplicationsPage
 import { ManagerCustomersPage } from "./pages/manager/ManagerCustomersPage";
 import { ManagerSettings } from "./pages/manager/ManagerSettings";
 import ManagerVisaApplicationsPage from "./pages/manager/ManagerVisaApplicationsPage";
+import { AgentProfilePage } from "./pages/manager/AgentProfilePage";
 import { AuthInitializer } from "./lib/AuthInitializer";
 import ApplicationPage from "./pages/customer/ApplicationPage";
 
@@ -72,6 +75,8 @@ const AppRoutes = () => {
           )
         }
       />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/start-registration" element={<StartRegistrationPage />} />
 
       {/* Customer Routes */}
@@ -146,6 +151,7 @@ const AppRoutes = () => {
                   element={<ManagerVisaApplicationsPage />}
                 />
                 <Route path="settings" element={<ManagerSettings />} />
+                <Route path="agents/:agentId" element={<AgentProfilePage />} />
                 <Route
                   path="*"
                   element={<Navigate to="/manager/dashboard" replace />}

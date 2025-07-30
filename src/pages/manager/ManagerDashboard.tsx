@@ -8,15 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Users,
-  Shield,
-  FileText,
-  Bell,
-  TrendingUp,
-  Clock,
-  Plus,
-} from "lucide-react";
+import { Users, Shield, FileText, Bell, TrendingUp, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Dialog,
@@ -36,15 +28,6 @@ import { RootState } from "@/app/store";
 export const ManagerDashboard: React.FC = () => {
   const { toast } = useToast();
   const { token } = useSelector((state: RootState) => state.customerAuth);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phoneNumber: "",
-    password: "",
-  });
-  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   // Move recent agents to state
   const [recentAgents, setRecentAgents] = useState<any[]>([]);
 
@@ -68,75 +51,6 @@ export const ManagerDashboard: React.FC = () => {
   }, [token]);
 
   console.log("Recent Agents:", recentAgents.length);
-
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    ["fullName", "email", "phoneNumber", "password"].forEach((field) => {
-      if (!form[field as keyof typeof form]) {
-        errors[field] = "Required";
-      }
-    });
-    return errors;
-  };
-
-  const handleAddAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormErrors({});
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
-    setAdding(true);
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/user/create-agent`,
-        form,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
-      toast({ title: "Success", description: "Agent created successfully!" });
-      setShowAddModal(false);
-      setForm({ fullName: "", email: "", phoneNumber: "", password: "" });
-      // Try to fetch latest agents from backend (if endpoint exists)
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
-          }
-        );
-        setRecentAgents(res.data.data || []);
-      } catch {
-        // Fallback: add the new agent locally
-        setRecentAgents((prev) => [
-          {
-            name: form.fullName,
-            email: form.email,
-            customers: 0,
-            status: "active",
-          },
-          ...prev.slice(0, 2),
-        ]);
-      }
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.response?.data?.message || "Failed to create agent.",
-        variant: "destructive",
-      });
-    } finally {
-      setAdding(false);
-    }
-  };
 
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
 
@@ -188,90 +102,7 @@ export const ManagerDashboard: React.FC = () => {
             Overview of all operations and performance
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus />
-          Add Agent
-        </Button>
       </div>
-
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add New Agent</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddAgent} className="space-y-3">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  name="fullName"
-                  value={form.fullName}
-                  onChange={handleFormChange}
-                />
-                {formErrors.fullName && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.fullName}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleFormChange}
-                />
-                {formErrors.email && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.email}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                <Input
-                  name="phoneNumber"
-                  value={form.phoneNumber}
-                  onChange={handleFormChange}
-                />
-                {formErrors.phoneNumber && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.phoneNumber}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleFormChange}
-                />
-                {formErrors.password && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.password}
-                  </span>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowAddModal(false)}
-                disabled={adding}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={adding} className="font-semibold">
-                {adding ? "Adding..." : "Add Agent"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">

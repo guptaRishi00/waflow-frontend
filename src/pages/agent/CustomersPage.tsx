@@ -26,6 +26,7 @@ import {
   MapPin,
   Plus,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -145,6 +146,25 @@ export const CustomersPage: React.FC = () => {
     password: "",
   });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Password strength validation
+  const checkPasswordStrength = (password: string) => {
+    const hasCapital = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasMinLength = password.length >= 8;
+
+    return {
+      hasCapital,
+      hasNumber,
+      hasSpecial,
+      hasMinLength,
+      isStrong: hasCapital && hasNumber && hasSpecial && hasMinLength,
+    };
+  };
+
+  const passwordStrength = checkPasswordStrength(form.password);
 
   // Handle form field changes
   const handleFormChange = (
@@ -186,6 +206,13 @@ export const CustomersPage: React.FC = () => {
         errors[field] = "Required";
       }
     });
+
+    // Check password strength
+    if (form.password && !passwordStrength.isStrong) {
+      errors.password =
+        "Password must be strong (capital letter, number, special character, min 8 chars)";
+    }
+
     return errors;
   };
 
@@ -404,6 +431,9 @@ export const CustomersPage: React.FC = () => {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create New Customer</DialogTitle>
+            <p className="">
+              All Fields are mandatory <span className="text-red-500">*</span>
+            </p>
           </DialogHeader>
           <form
             onSubmit={handleCreateCustomer}
@@ -411,7 +441,9 @@ export const CustomersPage: React.FC = () => {
           >
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">
+                  First Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="firstName"
                   value={form.firstName}
@@ -432,7 +464,9 @@ export const CustomersPage: React.FC = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">
+                  Last Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="lastName"
                   value={form.lastName}
@@ -445,7 +479,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="dob">Date of Birth</Label>
+                <Label htmlFor="dob">
+                  Date of Birth <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="dob"
                   type="date"
@@ -457,7 +493,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">
+                  Email <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="email"
                   type="email"
@@ -471,7 +509,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="phoneNumber">
+                  Phone Number <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="phoneNumber"
                   value={form.phoneNumber}
@@ -484,7 +524,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="currentAddress">Current Address</Label>
+                <Label htmlFor="currentAddress">
+                  Current Address <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="currentAddress"
                   value={form.currentAddress}
@@ -497,7 +539,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="permanentAddress">Permanent Address</Label>
+                <Label htmlFor="permanentAddress">
+                  Permanent Address <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="permanentAddress"
                   value={form.permanentAddress}
@@ -510,7 +554,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="nationality">Nationality</Label>
+                <Label htmlFor="nationality">
+                  Nationality <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="nationality"
                   value={form.nationality}
@@ -523,12 +569,25 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="gender">Gender</Label>
-                <Input
-                  name="gender"
+                <Label htmlFor="gender">
+                  Gender <span className="text-red-500">*</span>
+                </Label>
+                <Select
                   value={form.gender}
-                  onChange={handleFormChange}
-                />
+                  onValueChange={(value) => handleSelectChange("gender", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer-not-to-say">
+                      Prefer not to say
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
                 {formErrors.gender && (
                   <span className="text-xs text-red-500">
                     {formErrors.gender}
@@ -536,7 +595,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="designation">Designation</Label>
+                <Label htmlFor="designation">
+                  Designation <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="designation"
                   value={form.designation}
@@ -549,7 +610,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="companyType">Company Type</Label>
+                <Label htmlFor="companyType">
+                  Company Type <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="companyType"
                   value={form.companyType}
@@ -562,7 +625,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="jurisdiction">Jurisdiction</Label>
+                <Label htmlFor="jurisdiction">
+                  Jurisdiction <span className="text-red-500">*</span>
+                </Label>
                 <Select
                   value={form.jurisdiction}
                   onValueChange={(value) =>
@@ -585,7 +650,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="businessActivity1">Business Activity</Label>
+                <Label htmlFor="businessActivity1">
+                  Business Activity <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="businessActivity1"
                   value={form.businessActivity1}
@@ -598,7 +665,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="officeType">Office Type</Label>
+                <Label htmlFor="officeType">
+                  Office Type <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="officeType"
                   value={form.officeType}
@@ -611,7 +680,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="quotedPrice">Quoted Price</Label>
+                <Label htmlFor="quotedPrice">
+                  Quoted Price <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="quotedPrice"
                   value={form.quotedPrice}
@@ -624,7 +695,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="paymentPlans">Payment Plans</Label>
+                <Label htmlFor="paymentPlans">
+                  Payment Plans <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   name="paymentPlans"
                   value={form.paymentPlans}
@@ -637,7 +710,9 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div className="col-span-2">
-                <Label htmlFor="paymentDetails">Payment Details</Label>
+                <Label htmlFor="paymentDetails">
+                  Payment Details <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   name="paymentDetails"
                   value={form.paymentDetails}
@@ -650,13 +725,110 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div className="col-span-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleFormChange}
-                />
+                <Label htmlFor="password">
+                  Password <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={handleFormChange}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {/* Password Strength Indicator */}
+                {form.password && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Password strength requirements:
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasCapital
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasCapital
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Capital letter (A-Z)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasNumber
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasNumber
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Number (0-9)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasSpecial
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasSpecial
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Special character (!@#$%^&*)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasMinLength
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasMinLength
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Minimum 8 characters
+                      </div>
+                    </div>
+                    {passwordStrength.isStrong && (
+                      <div className="text-xs text-green-600 font-medium">
+                        ✓ Password is strong!
+                      </div>
+                    )}
+                  </div>
+                )}
                 {formErrors.password && (
                   <span className="text-xs text-red-500">
                     {formErrors.password}

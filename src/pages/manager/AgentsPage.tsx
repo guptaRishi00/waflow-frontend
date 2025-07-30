@@ -39,6 +39,7 @@ import {
   Search,
   MoreHorizontal,
   Eye,
+  EyeOff,
   Edit,
   UserX,
   UserCheck,
@@ -56,6 +57,7 @@ import type { Application } from "@/types";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import { useNavigate } from "react-router-dom";
 
 // Mock agents data
 const mockAgents = [
@@ -98,6 +100,7 @@ const mockAgents = [
 ];
 
 export const AgentsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [agents, setAgents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -115,7 +118,27 @@ export const AgentsPage: React.FC = () => {
     phone: "",
     password: "",
   });
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+
+  // Password strength validation
+  const checkPasswordStrength = (password: string) => {
+    const hasCapital = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasMinLength = password.length >= 8;
+
+    return {
+      hasCapital,
+      hasNumber,
+      hasSpecial,
+      hasMinLength,
+      isStrong: hasCapital && hasNumber && hasSpecial && hasMinLength,
+    };
+  };
+
+  const passwordStrength = checkPasswordStrength(newAgent.password);
 
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
 
@@ -126,12 +149,31 @@ export const AgentsPage: React.FC = () => {
   // );
 
   const handleCreateAgent = () => {
+    // Validate form
+    const errors: { [key: string]: string } = {};
+
+    if (!newAgent.name) errors.name = "Name is required";
+    if (!newAgent.email) errors.email = "Email is required";
+    if (!newAgent.phone) errors.phone = "Phone is required";
+    if (!newAgent.password) {
+      errors.password = "Password is required";
+    } else if (!passwordStrength.isStrong) {
+      errors.password =
+        "Password must be strong (capital letter, number, special character, min 8 chars)";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     toast({
       title: "Agent Created",
       description: `New agent ${newAgent.name} has been created successfully.`,
     });
     setIsCreateModalOpen(false);
     setNewAgent({ name: "", email: "", phone: "", password: "" });
+    setFormErrors({});
   };
 
   const handleEditAgent = () => {
@@ -163,7 +205,31 @@ export const AgentsPage: React.FC = () => {
   };
 
   const generatePassword = () => {
-    const password = Math.random().toString(36).slice(-8);
+    // Generate a strong password that meets all requirements
+    const chars = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "!@#$%^&*";
+    const capital = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    let password = "";
+
+    // Ensure at least one of each required character type
+    password += capital[Math.floor(Math.random() * capital.length)]; // Capital letter
+    password += numbers[Math.floor(Math.random() * numbers.length)]; // Number
+    password += special[Math.floor(Math.random() * special.length)]; // Special character
+
+    // Fill the rest with random characters to reach minimum length
+    const allChars = chars + numbers + special + capital;
+    for (let i = 0; i < 5; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+
+    // Shuffle the password to make it more random
+    password = password
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("");
+
     setNewAgent({ ...newAgent, password });
   };
 
@@ -258,13 +324,13 @@ export const AgentsPage: React.FC = () => {
             <DialogHeader>
               <DialogTitle>Create New Agent</DialogTitle>
               <DialogDescription>
-                Add a new agent to your team. Login credentials will be sent via
-                email.
+                Add a new agent to your team. All fields are required. Login
+                credentials will be sent via email.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">Full Name *</Label>
                 <Input
                   id="name"
                   value={newAgent.name}
@@ -272,10 +338,14 @@ export const AgentsPage: React.FC = () => {
                     setNewAgent({ ...newAgent, name: e.target.value })
                   }
                   placeholder="Enter agent's full name"
+                  className={formErrors.name ? "border-red-500" : ""}
                 />
+                {formErrors.name && (
+                  <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>
+                )}
               </div>
               <div>
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -284,10 +354,16 @@ export const AgentsPage: React.FC = () => {
                     setNewAgent({ ...newAgent, email: e.target.value })
                   }
                   placeholder="agent@waflow.com"
+                  className={formErrors.email ? "border-red-500" : ""}
                 />
+                {formErrors.email && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {formErrors.email}
+                  </p>
+                )}
               </div>
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Phone Number *</Label>
                 <Input
                   id="phone"
                   value={newAgent.phone}
@@ -295,20 +371,44 @@ export const AgentsPage: React.FC = () => {
                     setNewAgent({ ...newAgent, phone: e.target.value })
                   }
                   placeholder="+971-XX-XXX-XXXX"
+                  className={formErrors.phone ? "border-red-500" : ""}
                 />
+                {formErrors.phone && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {formErrors.phone}
+                  </p>
+                )}
               </div>
               <div>
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password *</Label>
                 <div className="flex gap-2">
-                  <Input
-                    id="password"
-                    type="password"
-                    value={newAgent.password}
-                    onChange={(e) =>
-                      setNewAgent({ ...newAgent, password: e.target.value })
-                    }
-                    placeholder="Enter password"
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={newAgent.password}
+                      onChange={(e) =>
+                        setNewAgent({ ...newAgent, password: e.target.value })
+                      }
+                      placeholder="Enter password"
+                      className={`pr-10 ${
+                        formErrors.password ? "border-red-500" : ""
+                      }`}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
@@ -317,6 +417,90 @@ export const AgentsPage: React.FC = () => {
                     Auto Generate
                   </Button>
                 </div>
+                {/* Password Strength Indicator */}
+                {newAgent.password && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Password strength requirements:
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasCapital
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasCapital
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Capital letter (A-Z)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasNumber
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasNumber
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Number (0-9)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasSpecial
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasSpecial
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Special character (!@#$%^&*)
+                      </div>
+                      <div
+                        className={`text-xs flex items-center gap-2 ${
+                          passwordStrength.hasMinLength
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            passwordStrength.hasMinLength
+                              ? "bg-green-600"
+                              : "bg-red-500"
+                          }`}
+                        ></div>
+                        Minimum 8 characters
+                      </div>
+                    </div>
+                    {passwordStrength.isStrong && (
+                      <div className="text-xs text-green-600 font-medium">
+                        ✓ Password is strong!
+                      </div>
+                    )}
+                  </div>
+                )}
+                {formErrors.password && (
+                  <span className="text-xs text-red-500">
+                    {formErrors.password}
+                  </span>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -449,8 +633,7 @@ export const AgentsPage: React.FC = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={() => {
-                              setSelectedAgent(agent);
-                              setIsViewModalOpen(true);
+                              navigate(`/manager/agents/${agent._id}`);
                             }}
                           >
                             <Eye className="h-4 w-4 mr-2" />
