@@ -16,6 +16,10 @@ import {
   TrendingUp,
   Clock,
   RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  UserCheck,
+  Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -136,11 +140,15 @@ export const ManagerDashboard: React.FC = () => {
     (app) => app.status === "Completed"
   ).length;
 
-  console.log("Completed applications count:", completedApplications);
-  console.log(
-    "Application statuses:",
-    allApplications.map((app) => app.status)
-  );
+  // Calculate pending applications (not completed)
+  const pendingApplications = allApplications.filter(
+    (app) => app.status !== "Completed"
+  ).length;
+
+  // Calculate active agents
+  const activeAgents = recentAgents.filter(
+    (agent) => agent.status === "active"
+  ).length;
 
   const stats = {
     totalAgents: recentAgents.length,
@@ -149,6 +157,50 @@ export const ManagerDashboard: React.FC = () => {
     completedApplications: completedApplications,
     pendingPayments: 0, // Static value as requested
   };
+
+  // Daily tasks for managers
+  const dailyTasks = [
+    {
+      id: 1,
+      title: "Review Pending Applications",
+      description: `${pendingApplications} applications need attention`,
+      icon: AlertCircle,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+      link: "/manager/applications",
+      completed: pendingApplications === 0,
+    },
+    {
+      id: 2,
+      title: "Check Agent Performance",
+      description: `${activeAgents} active agents to review`,
+      icon: UserCheck,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      link: "/manager/agents",
+      completed: false,
+    },
+    {
+      id: 3,
+      title: "Monitor Completed Applications",
+      description: `${completedApplications} applications completed today`,
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+      link: "/manager/applications",
+      completed: completedApplications > 0,
+    },
+    {
+      id: 4,
+      title: "Review Customer Feedback",
+      description: "Check customer satisfaction and feedback",
+      icon: Eye,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+      link: "/manager/customers",
+      completed: false,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -239,7 +291,8 @@ export const ManagerDashboard: React.FC = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+      {/* Daily Tasks and Recent Agents in same row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Agents */}
         <Card>
           <CardHeader>
@@ -282,8 +335,83 @@ export const ManagerDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
+        {/* Daily Tasks */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>
+              Key tasks to complete today for optimal operations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {dailyTasks.map((task) => {
+                const IconComponent = task.icon;
+                return (
+                  <Link key={task.id} to={task.link} className="block">
+                    <div
+                      className={`p-2 rounded-lg border-2 transition-all hover:shadow-md ${
+                        task.completed
+                          ? "border-green-200 bg-green-50"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <IconComponent
+                              className={`h-3 w-3 ${task.color}`}
+                            />
+                            <h3 className="font-medium text-xs">
+                              {task.title}
+                            </h3>
+                            {task.completed && (
+                              <CheckCircle className="h-3 w-3 text-green-600" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground ml-5">
+                            {task.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common management tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="flex-1 min-w-[200px]">
+              <Link to="/manager/agents">
+                <Shield className="h-4 w-4 mr-2" />
+                Manage Agents
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1 min-w-[200px]">
+              <Link to="/manager/customers">
+                <Users className="h-4 w-4 mr-2" />
+                View Customers
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1 min-w-[200px]">
+              <Link to="/manager/applications">
+                <FileText className="h-4 w-4 mr-2" />
+                Review Applications
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
