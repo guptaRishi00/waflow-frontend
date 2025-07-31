@@ -39,10 +39,12 @@ import { RootState } from "@/app/store";
 
 export const ManagerDashboard: React.FC = () => {
   const { toast } = useToast();
-  const { token } = useSelector((state: RootState) => state.customerAuth);
+  const { token, user } = useSelector((state: RootState) => state.customerAuth);
   // Move recent agents to state
   const [recentAgents, setRecentAgents] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   // Fetch agents from backend on mount
   useEffect(() => {
@@ -94,6 +96,58 @@ export const ManagerDashboard: React.FC = () => {
     };
     if (token) fetchAgents();
   }, [token]);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!token || !user?.userId) return;
+
+      setLoadingNotifications(true);
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/notification/admin/${
+            user.userId
+          }`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setNotifications(response.data.data || []);
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+        setNotifications([]);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+
+    fetchNotifications();
+  }, [token, user?.userId]);
+
+  // Mark notification as read
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await axios.patch(
+        `${
+          import.meta.env.VITE_BASE_URL
+        }/api/notification/read/${notificationId}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      // Update the notification status locally
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification._id === notificationId
+            ? { ...notification, status: "Read" }
+            : notification
+        )
+      );
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
 
   console.log("Recent Agents:", recentAgents.length);
 
@@ -367,50 +421,136 @@ export const ManagerDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Daily Tasks */}
+        {/* Notifications */}
         <Card>
           <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Key tasks to complete today for optimal operations
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle>Notifications</CardTitle>
+                  {notifications.filter((n) => n.status === "Unread").length >
+                    0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {
+                        notifications.filter((n) => n.status === "Unread")
+                          .length
+                      }
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  Recent updates and important alerts
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (token && user?.userId) {
+                    const fetchNotifications = async () => {
+                      setLoadingNotifications(true);
+                      try {
+                        const response = await axios.get(
+                          `${
+                            import.meta.env.VITE_BASE_URL
+                          }/api/notification/admin/${user.userId}`,
+                          {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }
+                        );
+                        setNotifications(response.data.data || []);
+                      } catch (error) {
+                        console.error("Error fetching notifications:", error);
+                      } finally {
+                        setLoadingNotifications(false);
+                      }
+                    };
+                    fetchNotifications();
+                  }
+                }}
+                disabled={loadingNotifications}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${
+                    loadingNotifications ? "animate-spin" : ""
+                  }`}
+                />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {dailyTasks.map((task) => {
-                const IconComponent = task.icon;
-                return (
-                  <Link key={task.id} to={task.link} className="block">
-                    <div
-                      className={`p-2 rounded-lg border-2 transition-all hover:shadow-md ${
-                        task.completed
-                          ? "border-green-200 bg-green-50"
-                          : "border-gray-200 bg-white hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <IconComponent
-                              className={`h-3 w-3 ${task.color}`}
-                            />
-                            <h3 className="font-medium text-xs">
-                              {task.title}
-                            </h3>
-                            {task.completed && (
-                              <CheckCircle className="h-3 w-3 text-green-600" />
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground ml-5">
-                            {task.description}
-                          </p>
+            {loadingNotifications ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="p-2 rounded-lg border-2 border-gray-200 bg-gray-50 animate-pulse"
+                  >
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            ) : notifications.length > 0 ? (
+              <div className="space-y-2">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification._id}
+                    className={`p-3 rounded-lg border-2 transition-all hover:shadow-md cursor-pointer ${
+                      notification.status === "Unread"
+                        ? "border-blue-200 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                    onClick={() => {
+                      if (notification.status === "Unread") {
+                        markAsRead(notification._id);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Bell className="h-4 w-4 text-blue-600" />
+                          <h3 className="font-medium text-sm">
+                            {notification.title}
+                          </h3>
+                          {notification.status === "Unread" && (
+                            <Badge variant="secondary" className="text-xs">
+                              New
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground ml-6 mb-2">
+                          {notification.message}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground ml-6">
+                          <span>
+                            {new Date(
+                              notification.createdAt
+                            ).toLocaleDateString()}
+                          </span>
+                          <span>
+                            {new Date(
+                              notification.createdAt
+                            ).toLocaleTimeString()}
+                          </span>
+                          <span className="capitalize">
+                            {notification.type}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </Link>
-                );
-              })}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <Bell className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No notifications yet
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
