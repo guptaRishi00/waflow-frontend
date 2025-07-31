@@ -26,7 +26,10 @@ const ForgotPassword: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(`/something`, { email });
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/auth/forgot-password`,
+        { email }
+      );
 
       if (response.status === 200) {
         setIsSubmitted(true);
