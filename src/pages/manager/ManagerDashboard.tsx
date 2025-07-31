@@ -411,7 +411,11 @@ export const ManagerDashboard: React.FC = () => {
                   </div>
                   <Badge
                     variant="default"
-                    className="bg-green-100 text-green-800"
+                    className={
+                      agent.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }
                   >
                     {agent.status || "active"}
                   </Badge>
