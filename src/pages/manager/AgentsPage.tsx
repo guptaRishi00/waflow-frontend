@@ -123,7 +123,7 @@ export const AgentsPage: React.FC = () => {
   //     agent.email.toLowerCase().includes(searchTerm.toLowerCase())
   // );
 
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     // Validate form
     const errors: { [key: string]: string } = {};
 
@@ -142,13 +142,43 @@ export const AgentsPage: React.FC = () => {
       return;
     }
 
-    toast({
-      title: "Agent Created",
-      description: `New agent ${newAgent.name} has been created successfully.`,
-    });
-    setIsCreateModalOpen(false);
-    setNewAgent({ name: "", email: "", phone: "", password: "" });
-    setFormErrors({});
+    setIsLoading(true);
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/user/create-agent`,
+        {
+          fullName: newAgent.name,
+          email: newAgent.email,
+          phoneNumber: newAgent.phone,
+          password: newAgent.password,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      toast({
+        title: "Success",
+        description: `New agent ${newAgent.name} has been created successfully.`,
+      });
+
+      // Refresh the agents list
+      fetchAgents();
+
+      setIsCreateModalOpen(false);
+      setNewAgent({ name: "", email: "", phone: "", password: "" });
+      setFormErrors({});
+    } catch (error: any) {
+      console.error("Agent creation error:", error);
+      console.error("Error response:", error?.response);
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to create agent",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditAgent = async () => {
@@ -301,62 +331,61 @@ export const AgentsPage: React.FC = () => {
     setNewAgent({ ...newAgent, password });
   };
 
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        setIsLoading(true);
-        setError("");
-        console.log("Fetching agents...");
-        console.log("Token:", token);
-        console.log("User:", user);
-        console.log("User role:", user?.role);
-        console.log("API URL:", import.meta.env.VITE_BASE_URL);
+  const fetchAgents = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      console.log("Fetching agents...");
+      console.log("Token:", token);
+      console.log("User:", user);
+      console.log("User role:", user?.role);
+      console.log("API URL:", import.meta.env.VITE_BASE_URL);
 
-        const baseUrl =
-          import.meta.env.VITE_BASE_URL || "http://localhost:5000";
-        console.log("Using base URL:", baseUrl);
+      const baseUrl = import.meta.env.VITE_BASE_URL || "http://localhost:5000";
+      console.log("Using base URL:", baseUrl);
 
-        const response = await axios.get(
-          // `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
-          `${baseUrl}/api/user/agents`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        console.log("Fetched agents:", response.data);
-        setAgents(response.data.data);
-      } catch (error) {
-        console.error("Error fetching agents:", error);
-        console.error("Error response:", error.response?.data);
-        console.error("Error status:", error.response?.status);
-
-        let errorMessage = "Failed to fetch agents";
-
-        if (error.response?.status === 403) {
-          console.error("Access denied - User role may not have permission");
-          console.error("Required roles: admin, manager");
-          console.error("Current user role:", user?.role);
-          errorMessage =
-            "Access denied. You don't have permission to view agents.";
-        } else if (error.response?.status === 401) {
-          console.error("Unauthorized - Token may be invalid or expired");
-          errorMessage = "Unauthorized. Please log in again.";
-        } else if (!error.response) {
-          console.error("Network error - Backend server may not be running");
-          errorMessage =
-            "Network error. Please check if the backend server is running.";
+      const response = await axios.get(
+        // `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
+        `${baseUrl}/api/user/agents`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
 
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
+      console.log("Fetched agents:", response.data);
+      setAgents(response.data.data);
+    } catch (error) {
+      console.error("Error fetching agents:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+
+      let errorMessage = "Failed to fetch agents";
+
+      if (error.response?.status === 403) {
+        console.error("Access denied - User role may not have permission");
+        console.error("Required roles: admin, manager");
+        console.error("Current user role:", user?.role);
+        errorMessage =
+          "Access denied. You don't have permission to view agents.";
+      } else if (error.response?.status === 401) {
+        console.error("Unauthorized - Token may be invalid or expired");
+        errorMessage = "Unauthorized. Please log in again.";
+      } else if (!error.response) {
+        console.error("Network error - Backend server may not be running");
+        errorMessage =
+          "Network error. Please check if the backend server is running.";
       }
-    };
 
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (token) {
       if (user?.role === "admin" || user?.role === "manager") {
         fetchAgents();

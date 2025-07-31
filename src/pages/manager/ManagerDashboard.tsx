@@ -55,7 +55,39 @@ export const ManagerDashboard: React.FC = () => {
             withCredentials: true,
           }
         );
-        setRecentAgents(res.data.data || []);
+        const agents = res.data.data || [];
+
+        // Get customer count for each agent using the new API endpoint
+        const agentsWithCustomerCount = await Promise.all(
+          agents.map(async (agent) => {
+            try {
+              const customerCountRes = await axios.get(
+                `${import.meta.env.VITE_BASE_URL}/api/dashboard/agent/${
+                  agent._id
+                }/customers`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+
+              return {
+                ...agent,
+                customers: customerCountRes.data.customerCount || 0,
+              };
+            } catch (err) {
+              console.error(
+                `Error fetching customer count for agent ${agent._id}:`,
+                err
+              );
+              return {
+                ...agent,
+                customers: 0,
+              };
+            }
+          })
+        );
+
+        setRecentAgents(agentsWithCustomerCount);
       } catch (err) {
         setRecentAgents([]);
       }
