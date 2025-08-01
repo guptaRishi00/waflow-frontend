@@ -24,6 +24,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 import type { Application } from "@/types";
 import {
   Dialog,
@@ -458,9 +459,7 @@ export const AgentDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Loading applications...
-            </div>
+            <PageLoader message="Loading applications..." />
           ) : applications.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               No applications found

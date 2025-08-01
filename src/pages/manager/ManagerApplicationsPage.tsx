@@ -12,6 +12,7 @@ import { Eye, MessageSquare, DollarSign, Filter } from "lucide-react";
 import { mockApplications } from "@/lib/mock-data";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 import { ApplicationDetailsModal } from "@/components/common/ApplicationDetailsModal";
 import type { Application } from "@/types";
 import ApplicationCard from "./ApplicationCard";
@@ -34,6 +35,7 @@ export const ManagerApplicationsPage: React.FC = () => {
   const [stepActionLoading, setStepActionLoading] = useState(false);
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
   const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
 
   const [demo, setDemo] = useState(null);
@@ -42,6 +44,7 @@ export const ManagerApplicationsPage: React.FC = () => {
   useEffect(() => {
     const fetchApplications = async () => {
       if (!token) return;
+      setIsLoading(true);
       try {
         const response = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/application`,
@@ -54,6 +57,8 @@ export const ManagerApplicationsPage: React.FC = () => {
         console.log("Fetched applications:", apps);
       } catch (err) {
         console.error("Error fetching applications:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchApplications();
@@ -235,6 +240,11 @@ export const ManagerApplicationsPage: React.FC = () => {
       console.error("Error refetching application:", err);
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return <PageLoader message="Loading applications..." size="lg" />;
+  }
 
   return (
     <div className="space-y-6 w-full px-4">

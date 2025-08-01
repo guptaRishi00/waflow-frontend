@@ -21,7 +21,7 @@ const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
-const SIDEBAR_WIDTH_ICON = "3rem";
+const SIDEBAR_WIDTH_ICON = "5rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContext = {
@@ -70,7 +70,20 @@ const SidebarProvider = React.forwardRef<
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
-    const [_open, _setOpen] = React.useState(defaultOpen);
+    const getInitialState = () => {
+      // Try to read from cookie first
+      const cookies = document.cookie.split(";");
+      const sidebarCookie = cookies.find((cookie) =>
+        cookie.trim().startsWith(`${SIDEBAR_COOKIE_NAME}=`)
+      );
+      if (sidebarCookie) {
+        const value = sidebarCookie.split("=")[1];
+        return value === "true";
+      }
+      return defaultOpen;
+    };
+
+    const [_open, _setOpen] = React.useState(getInitialState);
     const open = openProp ?? _open;
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
@@ -173,13 +186,20 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    // Always render the sidebar as a fixed-width, full-height column on the left
+    const { state } = useSidebar();
+
     return (
       <div
         ref={ref}
-        className="fixed top-0 left-0 h-screen min-h-screen w-[16rem] max-w-[16rem] flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border z-30"
-        data-state="expanded"
-        data-collapsible="none"
+        className={cn(
+          "fixed top-0 left-0 h-screen min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border z-30 transition-all duration-300 ease-in-out",
+          state === "expanded"
+            ? "w-[16rem] max-w-[16rem]"
+            : "w-[5rem] max-w-[5rem]",
+          className
+        )}
+        data-state={state}
+        data-collapsible={collapsible}
         data-variant={variant}
         data-side={side}
         {...props}
@@ -250,12 +270,15 @@ const SidebarInset = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"main">
 >(({ className, ...props }, ref) => {
+  const { state } = useSidebar();
+
   return (
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background",
+        "relative flex min-h-svh flex-1 flex-col bg-background transition-all duration-300 ease-in-out",
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
+        state === "collapsed" ? "ml-[5rem]" : "ml-[16rem]",
         className
       )}
       {...props}

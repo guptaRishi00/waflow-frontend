@@ -29,6 +29,7 @@ import { mockApplications } from "@/lib/mock-data";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 import axios from "axios";
 // import { Dialog } from '@radix-ui/react-dialog';
 import {
@@ -411,21 +412,7 @@ export const ManagerCustomersPage: React.FC = () => {
   }>({});
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">
-            Customer Management
-          </h1>
-          <p className="text-muted-foreground">
-            View and manage your assigned customers
-          </p>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading customers...</div>
-        </div>
-      </div>
-    );
+    return <PageLoader message="Loading customers..." size="lg" />;
   }
 
   return (

@@ -1,14 +1,11 @@
 import React from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Shield,
   FileText,
   Users,
   FolderOpen,
-  Settings,
-  LogOut,
-  Home,
   CreditCard,
 } from "lucide-react";
 import {
@@ -26,9 +23,9 @@ import {
 } from "@/components/ui/sidebar";
 // import { useAuth } from '@/contexts/AuthContext';
 import { Button } from "@/components/ui/button";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
-import { logout } from "@/features/customerAuthSlice";
+import { cn } from "@/lib/utils";
 
 const managerNavItems = [
   { title: "Dashboard", url: "/manager/dashboard", icon: LayoutDashboard },
@@ -36,11 +33,11 @@ const managerNavItems = [
   { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Customers", url: "/manager/customers", icon: Users },
   { title: "Documents", url: "/manager/directory", icon: FolderOpen },
-  {
-    title: "Visa Applications",
-    url: "/manager/visa-applications",
-    icon: CreditCard,
-  },
+  // {
+  //   title: "Visa Applications",
+  //   url: "/manager/visa-applications",
+  //   icon: CreditCard,
+  // },
   // { title: "Settings", url: "/manager/settings", icon: Settings },
 ];
 
@@ -50,17 +47,12 @@ export const ManagerSidebar: React.FC = () => {
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const isCollapsed = state === "collapsed";
 
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate("/auth");
-  };
-
   return (
-    <Sidebar className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="p-4">
+    <Sidebar
+      className="border-r border-sidebar-border bg-sidebar"
+      collapsible="icon"
+    >
+      <SidebarHeader className="p-4 border-b border-sidebar-border/30">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
             <img
@@ -68,87 +60,74 @@ export const ManagerSidebar: React.FC = () => {
               alt="Waflow Logo"
               className={`${
                 isCollapsed ? "w-8 h-8" : "w-32 h-8"
-              } object-contain`}
+              } object-contain transition-all duration-300`}
             />
           </div>
-          {!isCollapsed && (
-            <div>
-              <p className="text-xs text-sidebar-foreground/70">
-                Manager Portal
-              </p>
-            </div>
-          )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="p-3">
         <SidebarGroup>
-          {/* <SidebarGroupLabel className="text-sidebar-foreground/70">
-            Management
-          </SidebarGroupLabel> */}
           <SidebarGroupContent>
-            <SidebarMenu>
-              {managerNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
-                  >
-                    <NavLink
-                      to={item.url}
-                      className={({ isActive }) =>
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                      }
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <SidebarMenu className="space-y-1">
+              {managerNavItems.map((item) => {
+                // Check for exact match first, then check if current path starts with item URL
+                const isExactMatch = location.pathname === item.url;
+                const isNestedMatch =
+                  item.url !== "/manager/dashboard" &&
+                  location.pathname.startsWith(item.url + "/");
+                const isActive = isExactMatch || isNestedMatch;
+
+                // Debug logging
+                console.log(`Sidebar Item: ${item.title}`);
+                console.log(`  Item URL: ${item.url}`);
+                console.log(`  Current Path: ${location.pathname}`);
+                console.log(`  Exact Match: ${isExactMatch}`);
+                console.log(`  Nested Match: ${isNestedMatch}`);
+                console.log(`  Is Active: ${isActive}`);
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild tooltip={item.title}>
+                      <NavLink
+                        to={item.url}
+                        className={({ isActive: navIsActive }) => {
+                          const active = isActive || navIsActive;
+                          console.log(
+                            `  NavLink Active: ${navIsActive}, Final Active: ${active}`
+                          );
+                          return cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200",
+                            isCollapsed && "justify-center px-2",
+                            active
+                              ? "bg-blue-600 text-white font-semibold shadow-sm mx-1"
+                              : "text-white hover:bg-white/20 hover:text-white mx-1"
+                          );
+                        }}
+                      >
+                        <item.icon
+                          className={`h-5 w-5 flex-shrink-0 ${
+                            isCollapsed ? "mx-auto" : ""
+                          }`}
+                        />
+                        <span
+                          className={`transition-all duration-300 ease-in-out font-medium ${
+                            isCollapsed
+                              ? "opacity-0 scale-95 w-0 overflow-hidden"
+                              : "opacity-100 scale-100"
+                          }`}
+                        >
+                          {!isCollapsed && item.title}
+                        </span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-4">
-        {!isCollapsed && user && (
-          <div className="mb-4 p-3 bg-sidebar-accent rounded-lg">
-            <p className="text-sm font-medium text-sidebar-accent-foreground">
-              {user.name}
-            </p>
-            <p className="text-xs text-sidebar-accent-foreground/70">
-              {user.email}
-            </p>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/50"
-          >
-            <NavLink to="/">
-              <Home className="mr-2 h-4 w-4" />
-              {!isCollapsed && <span>Home</span>}
-            </NavLink>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-sidebar-foreground hover:bg-red-500/10 hover:text-red-400"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            {!isCollapsed && <span>Logout</span>}
-          </Button>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 };

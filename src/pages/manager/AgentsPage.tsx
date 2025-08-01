@@ -51,6 +51,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 
 import axios from "axios";
 import { useSelector } from "react-redux";
@@ -737,14 +738,7 @@ export const AgentsPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                <p className="text-muted-foreground">Loading agents...</p>
-              </div>
-            </div>
-          )}
+          {isLoading && <PageLoader message="Loading agents..." />}
 
           {error && (
             <div className="flex items-center justify-center py-8">

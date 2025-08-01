@@ -20,6 +20,9 @@ import {
   AlertCircle,
   UserCheck,
   Eye,
+  XCircle,
+  DollarSign,
+  UserCog,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -32,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
@@ -40,15 +44,25 @@ import { RootState } from "@/app/store";
 export const ManagerDashboard: React.FC = () => {
   const { toast } = useToast();
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
-  // Move recent agents to state
-  const [recentAgents, setRecentAgents] = useState<any[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Loading states
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [loadingApplications, setLoadingApplications] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+  // Data states
+  const [recentAgents, setRecentAgents] = useState<any[]>([]);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [allApplications, setAllApplications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch agents from backend on mount
   useEffect(() => {
     const fetchAgents = async () => {
+      setLoadingAgents(true);
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
@@ -91,7 +105,10 @@ export const ManagerDashboard: React.FC = () => {
 
         setRecentAgents(agentsWithCustomerCount);
       } catch (err) {
+        console.error("Error fetching agents:", err);
         setRecentAgents([]);
+      } finally {
+        setLoadingAgents(false);
       }
     };
     if (token) fetchAgents();
@@ -151,24 +168,30 @@ export const ManagerDashboard: React.FC = () => {
 
   console.log("Recent Agents:", recentAgents.length);
 
-  const [allCustomers, setAllCustomers] = useState<any[]>([]);
-
+  // Fetch customers
   useEffect(() => {
     const fetchCustomer = async () => {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setAllCustomers(response.data.data || []);
+      setLoadingCustomers(true);
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setAllCustomers(response.data.data || []);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        setAllCustomers([]);
+      } finally {
+        setLoadingCustomers(false);
+      }
     };
-    fetchCustomer();
-  }, []);
-
-  const [allApplications, setAllApplications] = useState<any[]>([]);
+    if (token) fetchCustomer();
+  }, [token]);
 
   const fetchApplications = async () => {
+    setLoadingApplications(true);
     try {
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/api/application`,
@@ -179,6 +202,9 @@ export const ManagerDashboard: React.FC = () => {
       setAllApplications(response.data.data || []);
     } catch (error) {
       console.error("Error fetching applications:", error);
+      setAllApplications([]);
+    } finally {
+      setLoadingApplications(false);
     }
   };
 
@@ -221,14 +247,32 @@ export const ManagerDashboard: React.FC = () => {
   console.log("All Applications:", allApplications.length);
   console.log("Applications data:", allApplications);
 
-  // Calculate completed applications
+  // Calculate application status breakdown
+  const applicationStatusCounts = {
+    inProgress: allApplications.filter((app) => app.status === "In Progress")
+      .length,
+    awaitingClientAction: allApplications.filter(
+      (app) => app.status === "Awaiting Client Action"
+    ).length,
+    underReview: allApplications.filter((app) => app.status === "Under Review")
+      .length,
+    approved: allApplications.filter((app) => app.status === "Approved").length,
+    rejected: allApplications.filter((app) => app.status === "Rejected").length,
+  };
+
+  // Calculate completion rate
+  const totalApplications = allApplications.length;
   const completedApplications = allApplications.filter(
-    (app) => app.status === "Completed"
+    (app) => app.status === "Completed" || app.status === "Approved"
   ).length;
+  const completionRate =
+    totalApplications > 0
+      ? Math.round((completedApplications / totalApplications) * 100)
+      : 0;
 
   // Calculate pending applications (not completed)
   const pendingApplications = allApplications.filter(
-    (app) => app.status !== "Completed"
+    (app) => app.status !== "Completed" && app.status !== "Approved"
   ).length;
 
   // Calculate active agents
@@ -236,11 +280,25 @@ export const ManagerDashboard: React.FC = () => {
     (agent) => agent.status === "active"
   ).length;
 
+  // Track overall loading state
+  useEffect(() => {
+    const allDataLoaded =
+      !loadingAgents &&
+      !loadingCustomers &&
+      !loadingApplications &&
+      !loadingNotifications;
+    setIsLoading(!allDataLoaded);
+  }, [
+    loadingAgents,
+    loadingCustomers,
+    loadingApplications,
+    loadingNotifications,
+  ]);
+
   const stats = {
     totalAgents: recentAgents.length,
     totalCustomers: allCustomers.length,
-    activeApplications: allApplications.length,
-    completedApplications: completedApplications,
+    completionRate: completionRate,
     pendingPayments: 0, // Static value as requested
   };
 
@@ -288,6 +346,11 @@ export const ManagerDashboard: React.FC = () => {
     },
   ];
 
+  // Loading state
+  if (isLoading) {
+    return <PageLoader message="Loading dashboard data..." size="lg" />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
@@ -310,8 +373,83 @@ export const ManagerDashboard: React.FC = () => {
         </Button>
       </div>
 
-      {/* Quick Stats */}
+      {/* Application Status Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">In Progress</p>
+                <p className="text-2xl font-bold">
+                  {applicationStatusCounts.inProgress}
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Awaiting Client Action
+                </p>
+                <p className="text-2xl font-bold">
+                  {applicationStatusCounts.awaitingClientAction}
+                </p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Under Review</p>
+                <p className="text-2xl font-bold">
+                  {applicationStatusCounts.underReview}
+                </p>
+              </div>
+              <Eye className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-2xl font-bold">
+                  {applicationStatusCounts.approved}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Rejected</p>
+                <p className="text-2xl font-bold">
+                  {applicationStatusCounts.rejected}
+                </p>
+              </div>
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Key Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -319,7 +457,7 @@ export const ManagerDashboard: React.FC = () => {
                 <p className="text-sm text-muted-foreground">Total Agents</p>
                 <p className="text-2xl font-bold">{stats.totalAgents}</p>
               </div>
-              <Shield className="h-8 w-8 text-primary" />
+              <UserCog className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -340,23 +478,10 @@ export const ManagerDashboard: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">
-                  All Applications
-                </p>
-                <p className="text-2xl font-bold">{stats.activeApplications}</p>
-              </div>
-              <FileText className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">
-                  {stats.completedApplications}
+                <p className="text-sm text-muted-foreground">Completion Rate</p>
+                <p className="text-2xl font-bold">{stats.completionRate}%</p>
+                <p className="text-xs text-muted-foreground">
+                  {completedApplications}/{totalApplications} applications
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
@@ -371,56 +496,112 @@ export const ManagerDashboard: React.FC = () => {
                 <p className="text-sm text-muted-foreground">Pending Payment</p>
                 <p className="text-2xl font-bold">{stats.pendingPayments}</p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <DollarSign className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Daily Tasks and Recent Agents in same row */}
+      {/* Recent Customers and Notifications in same row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Agents */}
+        {/* Recent Customers */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Agents</CardTitle>
-            <CardDescription>Newly added agents</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Recent Customers (Top 5)</CardTitle>
+                <CardDescription>Newly registered customers</CardDescription>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/manager/customers">See All</Link>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentAgents.map((agent, index) => (
-                <div
-                  key={String(
-                    ("fullName" in agent && agent.fullName) ||
-                      agent.email ||
-                      index
-                  )}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {String(
-                        "fullName" in agent ? agent.fullName : agent.name
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {agent.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {agent.customers ?? 0} customers
-                    </p>
-                  </div>
-                  <Badge
-                    variant="default"
-                    className={
-                      agent.status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }
-                  >
-                    {agent.status || "active"}
-                  </Badge>
+              {allCustomers
+                .sort(
+                  (a, b) =>
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+                )
+                .slice(0, 5)
+                .map((customer, index) => {
+                  // Find the customer's application
+                  const customerApplication = allApplications.find(
+                    (app) =>
+                      app.customer?._id === customer._id ||
+                      app.customerId === customer._id
+                  );
+
+                  // Find assigned agent
+                  const assignedAgent = recentAgents.find(
+                    (agent) => agent._id === customer.assignedAgentId
+                  );
+
+                  return (
+                    <div
+                      key={customer._id || index}
+                      className="p-3 border rounded-lg space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {customer.firstName} {customer.lastName}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {customer.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {customer.phoneNumber || "No phone"}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="default"
+                          className="bg-blue-100 text-blue-800"
+                        >
+                          Customer
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">
+                            Application:
+                          </span>
+                          <span className="ml-1 font-medium">
+                            {customerApplication?.applicationNumber ||
+                              "Not created"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Status:</span>
+                          <span className="ml-1 font-medium">
+                            {customerApplication?.status || "No application"}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Agent:</span>
+                          <span className="ml-1 font-medium">
+                            {assignedAgent
+                              ? `${
+                                  assignedAgent.fullName || assignedAgent.name
+                                }`
+                              : "Not assigned"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              {allCustomers.length === 0 && (
+                <div className="text-center py-4">
+                  <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No customers yet
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -432,54 +613,62 @@ export const ManagerDashboard: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <CardTitle>Notifications</CardTitle>
-                  {notifications.filter((n) => n.status === "Unread").length >
-                    0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {
-                        notifications.filter((n) => n.status === "Unread")
-                          .length
-                      }
-                    </Badge>
-                  )}
+                  <Badge variant="destructive" className="text-xs">
+                    {notifications.filter((n) => n.status === "Unread").length}
+                  </Badge>
                 </div>
-                <CardDescription>
-                  Recent updates and important alerts
-                </CardDescription>
+                <CardDescription>All unread notifications</CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (token && user?.userId) {
-                    const fetchNotifications = async () => {
-                      setLoadingNotifications(true);
-                      try {
-                        const response = await axios.get(
-                          `${
-                            import.meta.env.VITE_BASE_URL
-                          }/api/notification/admin/${user.userId}`,
-                          {
-                            headers: { Authorization: `Bearer ${token}` },
-                          }
-                        );
-                        setNotifications(response.data.data || []);
-                      } catch (error) {
-                        console.error("Error fetching notifications:", error);
-                      } finally {
-                        setLoadingNotifications(false);
-                      }
-                    };
-                    fetchNotifications();
-                  }
-                }}
-                disabled={loadingNotifications}
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    loadingNotifications ? "animate-spin" : ""
-                  }`}
-                />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Clear all notifications
+                    setNotifications([]);
+                    toast({
+                      title: "Notifications cleared",
+                      description: "All notifications have been cleared.",
+                    });
+                  }}
+                >
+                  Clear All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (token && user?.userId) {
+                      const fetchNotifications = async () => {
+                        setLoadingNotifications(true);
+                        try {
+                          const response = await axios.get(
+                            `${
+                              import.meta.env.VITE_BASE_URL
+                            }/api/notification/admin/${user.userId}`,
+                            {
+                              headers: { Authorization: `Bearer ${token}` },
+                            }
+                          );
+                          setNotifications(response.data.data || []);
+                        } catch (error) {
+                          console.error("Error fetching notifications:", error);
+                        } finally {
+                          setLoadingNotifications(false);
+                        }
+                      };
+                      fetchNotifications();
+                    }
+                  }}
+                  disabled={loadingNotifications}
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      loadingNotifications ? "animate-spin" : ""
+                    }`}
+                  />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -496,7 +685,7 @@ export const ManagerDashboard: React.FC = () => {
                 ))}
               </div>
             ) : notifications.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-96 overflow-y-auto">
                 {notifications.map((notification) => (
                   <div
                     key={notification._id}
@@ -558,36 +747,6 @@ export const ManagerDashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common management tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild className="flex-1 min-w-[200px]">
-              <Link to="/manager/agents">
-                <Shield className="h-4 w-4 mr-2" />
-                Manage Agents
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="flex-1 min-w-[200px]">
-              <Link to="/manager/customers">
-                <Users className="h-4 w-4 mr-2" />
-                View Customers
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="flex-1 min-w-[200px]">
-              <Link to="/manager/applications">
-                <FileText className="h-4 w-4 mr-2" />
-                Review Applications
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

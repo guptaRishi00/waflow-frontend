@@ -21,6 +21,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export const CustomerDashboard: React.FC = () => {
   const { user, token } = useSelector((state: RootState) => state.customerAuth);
@@ -83,22 +84,7 @@ export const CustomerDashboard: React.FC = () => {
   }, [token, user, toast]);
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Welcome back!</h1>
-          <p className="text-muted-foreground">
-            Track your UAE business registration progress
-          </p>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading your application data...
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoader message="Loading your application data..." size="lg" />;
   }
 
   if (!application) {
