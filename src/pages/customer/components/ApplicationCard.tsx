@@ -3,17 +3,22 @@ import { User, Calendar } from "lucide-react"; // Using lucide-react for icons
 
 // Helper to get Tailwind CSS classes for different statuses
 const getStatusClasses = (status: string) => {
-  const lowerStatus = status.toLowerCase();
-  if (lowerStatus.includes("review")) {
+  if (status === "New" || status === "Ready for Processing") {
+    return "bg-blue-100 text-blue-800 border-blue-200";
+  }
+  if (status === "In Progress" || status === "Waiting for Agent Review") {
     return "bg-yellow-100 text-yellow-800 border-yellow-200";
   }
-  if (lowerStatus.includes("approved") || lowerStatus.includes("completed")) {
+  if (status === "Completed" || status === "Approved") {
     return "bg-green-100 text-green-800 border-green-200";
   }
-  if (lowerStatus.includes("rejected") || lowerStatus.includes("failed")) {
+  if (status === "Rejected" || status === "Declined") {
     return "bg-red-100 text-red-800 border-red-200";
   }
-  return "bg-slate-100 text-slate-800 border-slate-200";
+  if (status === "Awaiting Client Response") {
+    return "bg-orange-100 text-orange-800 border-orange-200";
+  }
+  return "bg-gray-100 text-gray-800 border-gray-200";
 };
 
 export default function ApplicationCard({ application }: { application: any }) {

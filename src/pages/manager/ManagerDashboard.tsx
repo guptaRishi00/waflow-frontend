@@ -41,6 +41,25 @@ import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 
+interface Application {
+  _id: string;
+  customer:
+    | string
+    | {
+        _id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phoneNumber?: string;
+      };
+  status: string;
+  steps: Array<{
+    stepName: string;
+    status: string;
+  }>;
+  createdAt: string;
+}
+
 export const ManagerDashboard: React.FC = () => {
   const { toast } = useToast();
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
@@ -55,7 +74,7 @@ export const ManagerDashboard: React.FC = () => {
   // Data states
   const [recentAgents, setRecentAgents] = useState<any[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
-  const [allApplications, setAllApplications] = useState<any[]>([]);
+  const [allApplications, setAllApplications] = useState<Application[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -246,6 +265,8 @@ export const ManagerDashboard: React.FC = () => {
 
   console.log("All Applications:", allApplications.length);
   console.log("Applications data:", allApplications);
+  console.log("All Customers:", allCustomers.length);
+  console.log("Customers data:", allCustomers);
 
   // Calculate application status breakdown
   const applicationStatusCounts = {
@@ -527,12 +548,38 @@ export const ManagerDashboard: React.FC = () => {
                 )
                 .slice(0, 5)
                 .map((customer, index) => {
+                  console.log(`Processing customer ${customer._id}:`, customer);
                   // Find the customer's application
-                  const customerApplication = allApplications.find(
-                    (app) =>
-                      app.customer?._id === customer._id ||
-                      app.customerId === customer._id
-                  );
+                  const customerApplication = allApplications.find((app) => {
+                    // Handle populated customer object
+                    if (
+                      app.customer &&
+                      typeof app.customer === "object" &&
+                      "_id" in app.customer
+                    ) {
+                      const match =
+                        (app.customer as { _id: string })._id === customer._id;
+                      if (match) {
+                        console.log(
+                          `Found application for customer ${customer._id}:`,
+                          app
+                        );
+                      }
+                      return match;
+                    }
+                    // Handle customer as string ID
+                    if (app.customer && typeof app.customer === "string") {
+                      const match = app.customer === customer._id;
+                      if (match) {
+                        console.log(
+                          `Found application for customer ${customer._id}:`,
+                          app
+                        );
+                      }
+                      return match;
+                    }
+                    return false;
+                  });
 
                   // Find assigned agent
                   const assignedAgent = recentAgents.find(
@@ -570,14 +617,38 @@ export const ManagerDashboard: React.FC = () => {
                             Application:
                           </span>
                           <span className="ml-1 font-medium">
-                            {customerApplication?.applicationNumber ||
-                              "Not created"}
+                            {customerApplication ? "Created" : "Not created"}
                           </span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Status:</span>
-                          <span className="ml-1 font-medium">
-                            {customerApplication?.status || "No application"}
+                          <span className="ml-1">
+                            {customerApplication?.status ? (
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${
+                                  customerApplication.status === "New" ||
+                                  customerApplication.status === "Ready for Processing"
+                                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                                    : customerApplication.status === "In Progress" ||
+                                      customerApplication.status === "Waiting for Agent Review"
+                                    ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                    : customerApplication.status === "Completed" ||
+                                      customerApplication.status === "Approved"
+                                    ? "bg-green-100 text-green-800 border-green-200"
+                                    : customerApplication.status === "Rejected" ||
+                                      customerApplication.status === "Declined"
+                                    ? "bg-red-100 text-red-800 border-red-200"
+                                    : customerApplication.status === "Awaiting Client Response"
+                                    ? "bg-orange-100 text-orange-800 border-orange-200"
+                                    : "bg-gray-100 text-gray-800 border-gray-200"
+                                }`}
+                              >
+                                {customerApplication.status}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">No application</span>
+                            )}
                           </span>
                         </div>
                         <div className="col-span-2">

@@ -78,7 +78,15 @@ interface Customer {
 
 interface Application {
   _id: string;
-  customer: string;
+  customer:
+    | string
+    | {
+        _id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phoneNumber?: string;
+      };
   status: string;
   steps: Array<{
     stepName: string;
@@ -350,16 +358,21 @@ export const ManagerCustomersPage: React.FC = () => {
   const getCustomerApplications = (customerId: string) => {
     return applications.filter((app) => {
       if (!app.customer) return false;
-      if (typeof app.customer === "string") {
-        return app.customer === customerId;
-      } else if (
+
+      // Handle populated customer object (from backend populate)
+      if (
         typeof app.customer === "object" &&
         app.customer !== null &&
-        "_id" in app.customer &&
-        typeof (app.customer as { _id: string })._id === "string"
+        "_id" in app.customer
       ) {
         return (app.customer as { _id: string })._id === customerId;
       }
+
+      // Handle customer as string ID
+      if (typeof app.customer === "string") {
+        return app.customer === customerId;
+      }
+
       return false;
     });
   };
@@ -1186,7 +1199,44 @@ export const ManagerCustomersPage: React.FC = () => {
                             key={app._id}
                             className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
                           >
-                            <div></div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm font-medium">
+                                  Application ID:
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {app._id}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    app.status === "New" ||
+                                    app.status === "Ready for Processing"
+                                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                                      : app.status === "In Progress" ||
+                                        app.status ===
+                                          "Waiting for Agent Review"
+                                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                      : app.status === "Completed" ||
+                                        app.status === "Approved"
+                                      ? "bg-green-100 text-green-800 border-green-200"
+                                      : app.status === "Rejected" ||
+                                        app.status === "Declined"
+                                      ? "bg-red-100 text-red-800 border-red-200"
+                                      : app.status ===
+                                        "Awaiting Client Response"
+                                      ? "bg-orange-100 text-orange-800 border-orange-200"
+                                      : "bg-gray-100 text-gray-800 border-gray-200"
+                                  }`}
+                                >
+                                  {app.status}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Created:{" "}
+                                {new Date(app.createdAt).toLocaleDateString()}
+                              </div>
+                            </div>
                             <div className="flex gap-2 min-w-[220px]">
                               <Textarea
                                 placeholder="Add a note (optional)"
