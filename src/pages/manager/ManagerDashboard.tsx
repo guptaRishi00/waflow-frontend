@@ -23,6 +23,7 @@ import {
   XCircle,
   DollarSign,
   UserCog,
+  MessageSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -680,13 +681,8 @@ export const ManagerDashboard: React.FC = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <CardTitle>Notifications</CardTitle>
-                  <Badge variant="destructive" className="text-xs">
-                    {notifications.filter((n) => n.status === "Unread").length}
-                  </Badge>
-                </div>
-                <CardDescription>All unread notifications</CardDescription>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>Important updates and alerts</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -742,75 +738,124 @@ export const ManagerDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             {loadingNotifications ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="p-2 rounded-lg border-2 border-gray-200 bg-gray-50 animate-pulse"
+                    className="p-4 rounded-lg bg-gray-100 animate-pulse"
                   >
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                ))}
-              </div>
-            ) : notifications.length > 0 ? (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification._id}
-                    className={`p-3 rounded-lg border-2 transition-all hover:shadow-md cursor-pointer ${
-                      notification.status === "Unread"
-                        ? "border-blue-200 bg-blue-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                    onClick={() => {
-                      if (notification.status === "Unread") {
-                        markAsRead(notification._id);
-                      }
-                    }}
-                  >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gray-200 rounded"></div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Bell className="h-4 w-4 text-blue-600" />
-                          <h3 className="font-medium text-sm">
-                            {notification.title}
-                          </h3>
-                          {notification.status === "Unread" && (
-                            <Badge variant="secondary" className="text-xs">
-                              New
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground ml-6 mb-2">
-                          {notification.message}
-                        </p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground ml-6">
-                          <span>
-                            {new Date(
-                              notification.createdAt
-                            ).toLocaleDateString()}
-                          </span>
-                          <span>
-                            {new Date(
-                              notification.createdAt
-                            ).toLocaleTimeString()}
-                          </span>
-                          <span className="capitalize">
-                            {notification.type}
-                          </span>
-                        </div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-4">
-                <Bell className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No notifications yet
-                </p>
+              <div className="space-y-3">
+                {/* KYC Review Card */}
+                <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                      <Clock className="h-5 w-5 text-yellow-700" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-yellow-800 text-sm">
+                        Review KYC Documents
+                      </h3>
+                      <p className="text-yellow-600 text-xs">
+                        {pendingApplications} customers waiting for verification
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Messages Card */}
+                <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <MessageSquare className="h-5 w-5 text-blue-700" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-blue-800 text-sm">
+                        Customer Messages
+                      </h3>
+                      <p className="text-blue-600 text-xs">
+                        {
+                          notifications.filter((n) => n.type === "message")
+                            .length
+                        }{" "}
+                        unread messages requiring response
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* License Applications Card */}
+                <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-green-800 text-sm">
+                        License Applications
+                      </h3>
+                      <p className="text-green-600 text-xs">
+                        {
+                          allApplications.filter(
+                            (app) => app.status === "Ready for Processing"
+                          ).length
+                        }{" "}
+                        applications ready for submission
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dynamic notifications from API */}
+                {notifications.length > 0 && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      Recent Notifications
+                    </h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {notifications.slice(0, 3).map((notification) => (
+                        <div
+                          key={notification._id}
+                          className={`p-2 rounded-lg transition-all hover:shadow-sm cursor-pointer ${
+                            notification.status === "Unread"
+                              ? "bg-blue-50 border border-blue-200"
+                              : "bg-gray-50 border border-gray-200"
+                          }`}
+                          onClick={() => {
+                            if (notification.status === "Unread") {
+                              markAsRead(notification._id);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Bell className="h-3 w-3 text-blue-600 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-medium text-xs truncate">
+                                {notification.title}
+                              </h5>
+                              <p className="text-xs text-gray-600 truncate">
+                                {notification.message}
+                              </p>
+                            </div>
+                            {notification.status === "Unread" && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
