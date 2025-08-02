@@ -9,39 +9,30 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Eye,
-  EyeOff,
-  Search,
-  Mail,
-  Phone,
-  Building,
-  Filter,
-  MessageSquare,
-  Plus,
-  FileText,
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { CustomerNotesPage } from "@/components/common/CustomerNotesPage";
-import { ApplicationDetailsModal } from "@/components/common/ApplicationDetailsModal";
-import { mockApplications } from "@/lib/mock-data";
-// import type { Application } from '@/types';
-import { useSelector } from "react-redux";
-import { RootState } from "@/app/store";
-import { useToast } from "@/hooks/use-toast";
-import { PageLoader } from "@/components/ui/page-loader";
-import axios from "axios";
-// import { Dialog } from '@radix-ui/react-dialog';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -49,33 +40,68 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Eye,
+  Search,
+  Filter,
+  FileText,
+  Users,
+  UserCheck,
+  Clock,
+  FileCheck,
+  MoreHorizontal,
+  Edit,
+  UserX,
+  Phone,
+  Mail,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  EyeOff,
+} from "lucide-react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
+import { useToast } from "@/hooks/use-toast";
+import { PageLoader } from "@/components/ui/page-loader";
+import axios from "axios";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-// Mock customer data
+// Customer interface
 interface Customer {
   _id: string;
+  customerId: string;
   firstName: string;
   middleName?: string;
   lastName: string;
-  dob?: string;
   email: string;
   phoneNumber?: string;
-  currentAddress?: string;
-  permanentAddress?: string;
   nationality?: string;
-  gender?: string;
-  designation?: string;
-  companyType?: string;
-  jurisdiction?: string;
-  businessActivity1?: string;
-  officeType?: string;
-  quotedPrice?: number;
-  paymentPlans?: string[] | string;
-  paymentDetails?: string;
-  createdAt: string;
   assignedAgentId?: string;
-  userId: string;
+  assignedAgentRole?: string;
+  createdAt: string;
+  updatedAt?: string;
+  status?: string;
+  emiratesIdNumber?: string;
+  passportNumber?: string;
+  address?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    country: string;
+    zipcode: string;
+  };
+  assignedAgent?: {
+    _id: string;
+    agentId: string;
+    fullName: string;
+    email: string;
+  };
 }
 
+// Application interface
 interface Application {
   _id: string;
   customer:
@@ -85,13 +111,8 @@ interface Application {
         firstName: string;
         lastName: string;
         email: string;
-        phoneNumber?: string;
       };
   status: string;
-  steps: Array<{
-    stepName: string;
-    status: string;
-  }>;
   createdAt: string;
 }
 
@@ -100,69 +121,62 @@ export const ManagerCustomersPage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { token } = useSelector((state: RootState) => state.customerAuth);
+  const { toast } = useToast();
+
+  // Modal states
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
-  const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
+  const [customerToToggle, setCustomerToToggle] = useState<Customer | null>(
+    null
+  );
 
-  const { token, user } = useSelector((state: RootState) => state.customerAuth);
-  const { toast } = useToast();
+  // Edit form state
+  const [editFormData, setEditFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    nationality: "",
+    password: "",
+  });
+  const [editFormErrors, setEditFormErrors] = useState<{
+    [key: string]: string;
+  }>({});
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Fetch applications from backend
-  const fetchApplications = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/application`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const apps = response.data.data;
-      setApplications(apps);
-    } catch (err) {
-      console.error("Error fetching applications:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load applications.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchApplications();
-  }, [token, toast]);
-
-  // Modal state and form fields for creating a customer
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
+  // Create customer form state
+  const [createFormData, setCreateFormData] = useState({
     firstName: "",
     middleName: "",
     lastName: "",
     dob: "",
     email: "",
     phoneNumber: "",
-    currentAddress: "",
-    permanentAddress: "",
+    addressLine1: "",
+    addressLine2: "",
+    addressCity: "",
+    addressState: "",
+    addressCountry: "",
+    addressZipcode: "",
     nationality: "",
     gender: "",
-    designation: "",
-    companyType: "",
-    jurisdiction: "",
-    businessActivity1: "",
-    officeType: "",
-    quotedPrice: "",
-    paymentPlans: "",
-    paymentDetails: "",
+    emiratesId: "",
+    passportNumber: "",
     password: "",
   });
-  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-  const [showPassword, setShowPassword] = useState(false);
+  const [createFormErrors, setCreateFormErrors] = useState<{
+    [key: string]: string;
+  }>({});
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Password strength validation
   const checkPasswordStrength = (password: string) => {
@@ -180,51 +194,401 @@ export const ManagerCustomersPage: React.FC = () => {
     };
   };
 
-  const passwordStrength = checkPasswordStrength(form.password);
+  const passwordStrength = checkPasswordStrength(createFormData.password);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // Fetch agent details by agent ID
+  const fetchAgentDetails = async (agentId: string) => {
+    if (!token) return null;
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agents/${agentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data.data;
+    } catch (err) {
+      console.error("Error fetching agent details:", err);
+      return null;
+    }
+  };
+
+  // Fetch customers from backend
+  const fetchCustomers = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const customersData = response.data.data || [];
+
+      // Fetch agent details for each customer with assignedAgentId
+      const customersWithAgents = await Promise.all(
+        customersData.map(async (customer) => {
+          if (customer.assignedAgentId) {
+            const agentDetails = await fetchAgentDetails(
+              customer.assignedAgentId
+            );
+            return {
+              ...customer,
+              assignedAgent: agentDetails,
+            };
+          }
+          return customer;
+        })
+      );
+
+      setCustomers(customersWithAgents);
+    } catch (err) {
+      console.error("Error fetching customers:", err);
+      setError("Failed to load customers");
+      toast({
+        title: "Error",
+        description: "Failed to load customers.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch applications from backend
+  const fetchApplications = async () => {
+    if (!token) return;
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setApplications(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching applications:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+    fetchApplications();
+  }, [token]);
+
+  // Calculate summary statistics
+  const totalCustomers = customers.length;
+  const activeCustomers = customers.filter(
+    (customer) =>
+      customer.status === "active" ||
+      (customer.assignedAgentId && customer.assignedAgentId !== null)
+  ).length;
+  const pendingAssignment = customers.filter(
+    (customer) => !customer.assignedAgentId || customer.assignedAgentId === null
+  ).length;
+  const totalApplications = applications.length;
+
+  // Get customer applications count
+  const getCustomerApplicationsCount = (customerId: string) => {
+    return applications.filter((app) => {
+      if (typeof app.customer === "string") {
+        return app.customer === customerId;
+      }
+      if (typeof app.customer === "object" && app.customer !== null) {
+        return (app.customer as any)._id === customerId;
+      }
+      return false;
+    }).length;
+  };
+
+  // Get customer status
+  const getCustomerStatus = (customer: Customer) => {
+    if (customer.status) return customer.status;
+    return customer.assignedAgentId ? "active" : "pending";
+  };
+
+  // Get customer name
+  const getCustomerName = (customer: Customer) => {
+    return `${customer.firstName} ${customer.lastName}`;
+  };
+
+  // Get customer initials
+  const getCustomerInitials = (customer: Customer) => {
+    return `${customer.firstName[0]}${customer.lastName[0]}`;
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-GB");
+  };
+
+  // Handle edit customer
+  const handleEditCustomer = async () => {
+    if (!selectedCustomer || !token) return;
+
+    // Validate form
+    const errors: { [key: string]: string } = {};
+    if (!editFormData.firstName) errors.firstName = "First name is required";
+    if (!editFormData.lastName) errors.lastName = "Last name is required";
+    if (!editFormData.email) errors.email = "Email is required";
+    if (!editFormData.phoneNumber)
+      errors.phoneNumber = "Phone number is required";
+    if (!editFormData.nationality)
+      errors.nationality = "Nationality is required";
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const updateData: any = {
+        firstName: editFormData.firstName,
+        lastName: editFormData.lastName,
+        email: editFormData.email,
+        phoneNumber: editFormData.phoneNumber,
+        nationality: editFormData.nationality,
+      };
+
+      // Only include password if it's provided
+      if (editFormData.password) {
+        updateData.password = editFormData.password;
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customer/${
+          selectedCustomer._id
+        }`,
+        updateData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      toast({
+        title: "Success",
+        description: "Customer updated successfully!",
+      });
+
+      // Update the customers list with the new data
+      setCustomers((prevCustomers) =>
+        prevCustomers.map((customer) =>
+          customer._id === selectedCustomer._id
+            ? { ...customer, ...response.data.data }
+            : customer
+        )
+      );
+
+      setIsEditModalOpen(false);
+      setEditFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneNumber: "",
+        nationality: "",
+        password: "",
+      });
+      setEditFormErrors({});
+      setShowEditPassword(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description:
+          error?.response?.data?.message || "Failed to update customer",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Handle toggle status
+  const handleToggleStatus = (customer: Customer) => {
+    setCustomerToToggle(customer);
+    setIsStatusModalOpen(true);
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!customerToToggle || !token) return;
+
+    const newStatus =
+      getCustomerStatus(customerToToggle) === "active" ? "inactive" : "active";
+
+    setIsUpdating(true);
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customer/${
+          customerToToggle._id
+        }`,
+        { status: newStatus },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Update the customers list with the new status
+      setCustomers((prevCustomers) =>
+        prevCustomers.map((customer) =>
+          customer._id === customerToToggle._id
+            ? { ...customer, status: newStatus }
+            : customer
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `Customer ${getCustomerName(customerToToggle)} has been ${
+          newStatus === "active" ? "activated" : "deactivated"
+        } successfully.`,
+      });
+
+      setIsStatusModalOpen(false);
+      setCustomerToToggle(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description:
+          error?.response?.data?.message || "Failed to update customer status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // Handle form field changes
-  const handleFormChange = (
+  const handleCreateFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setCreateFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Handle Select field changes
-  const handleSelectChange = (name: string, value: string) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
+  const handleCreateSelectChange = (name: string, value: string) => {
+    setCreateFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Validate required fields
-  const validateForm = () => {
+  const validateCreateForm = () => {
     const errors: { [key: string]: string } = {};
-    [
+
+    // Required fields according to backend controller
+    const requiredFields = [
       "firstName",
       "lastName",
       "dob",
+      "gender",
       "email",
       "phoneNumber",
-      "currentAddress",
-      "permanentAddress",
       "nationality",
-      "gender",
-      "designation",
-      "companyType",
-      "jurisdiction",
-      "businessActivity1",
-      "officeType",
-      "quotedPrice",
-      "paymentPlans",
-      "paymentDetails",
+      "passportNumber",
       "password",
-    ].forEach((field) => {
-      if (!form[field as keyof typeof form]) {
+    ];
+
+    requiredFields.forEach((field) => {
+      const value = createFormData[field as keyof typeof createFormData];
+      if (!value || (typeof value === "string" && value.trim() === "")) {
         errors[field] = "Required";
       }
     });
 
+    // Validate address fields (address is required in backend)
+    if (
+      !createFormData.addressLine1 ||
+      createFormData.addressLine1.trim() === ""
+    ) {
+      errors.addressLine1 = "Required";
+    }
+    if (
+      !createFormData.addressCity ||
+      createFormData.addressCity.trim() === ""
+    ) {
+      errors.addressCity = "Required";
+    }
+    if (
+      !createFormData.addressState ||
+      createFormData.addressState.trim() === ""
+    ) {
+      errors.addressState = "Required";
+    }
+    if (
+      !createFormData.addressCountry ||
+      createFormData.addressCountry.trim() === ""
+    ) {
+      errors.addressCountry = "Required";
+    }
+    if (
+      !createFormData.addressZipcode ||
+      createFormData.addressZipcode.trim() === ""
+    ) {
+      errors.addressZipcode = "Required";
+    }
+
+    // Validate email format
+    if (
+      createFormData.email &&
+      !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(createFormData.email)
+    ) {
+      errors.email = "Invalid email address";
+    }
+
+    // Validate phone number format (7-15 digits)
+    if (
+      createFormData.phoneNumber &&
+      !/^\d{7,15}$/.test(createFormData.phoneNumber)
+    ) {
+      errors.phoneNumber = "Phone number must be 7 to 15 digits";
+    }
+
+    // Validate passport number format (alphanumeric, max 20 chars)
+    if (
+      createFormData.passportNumber &&
+      !/^[a-zA-Z0-9]*$/.test(createFormData.passportNumber)
+    ) {
+      errors.passportNumber = "Passport number must be alphanumeric";
+    }
+
+    // Validate first name and last name (alphabets only)
+    if (
+      createFormData.firstName &&
+      !/^[A-Za-z\s]+$/.test(createFormData.firstName)
+    ) {
+      errors.firstName = "First name should contain alphabets only";
+    }
+
+    if (
+      createFormData.lastName &&
+      !/^[A-Za-z\s]+$/.test(createFormData.lastName)
+    ) {
+      errors.lastName = "Last name should contain alphabets only";
+    }
+
+    // Validate middle name (alphabets only, optional)
+    if (
+      createFormData.middleName &&
+      !/^[A-Za-z\s]*$/.test(createFormData.middleName)
+    ) {
+      errors.middleName = "Middle name should contain alphabets only";
+    }
+
+    // Validate emirates ID (alphanumeric, optional)
+    if (
+      createFormData.emiratesId &&
+      !/^[a-zA-Z0-9]*$/.test(createFormData.emiratesId)
+    ) {
+      errors.emiratesId = "Emirates ID must be alphanumeric";
+    }
+
     // Check password strength
-    if (form.password && !passwordStrength.isStrong) {
+    if (createFormData.password && !passwordStrength.isStrong) {
       errors.password =
         "Password must be strong (capital letter, number, special character, min 8 chars)";
     }
@@ -232,20 +596,63 @@ export const ManagerCustomersPage: React.FC = () => {
     return errors;
   };
 
-  // Handle form submit
+  // Handle create customer
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormErrors({});
-    const errors = validateForm();
+    setCreateFormErrors({});
+    const errors = validateCreateForm();
     if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
+      setCreateFormErrors(errors);
       return;
     }
-    setCreating(true);
+    setIsCreating(true);
     try {
-      const payload = {
-        ...form,
+      // Ensure all required fields are present
+      if (
+        !createFormData.passportNumber ||
+        !createFormData.addressLine1 ||
+        !createFormData.addressCity ||
+        !createFormData.addressState ||
+        !createFormData.addressCountry ||
+        !createFormData.addressZipcode
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "Passport number and all address fields are required.",
+          variant: "destructive",
+        });
+        setIsCreating(false);
+        return;
+      }
+
+      const payload: any = {
+        firstName: createFormData.firstName,
+        middleName: createFormData.middleName || "",
+        lastName: createFormData.lastName,
+        dob: createFormData.dob,
+        email: createFormData.email,
+        phoneNumber: createFormData.phoneNumber,
+        address: {
+          line1: createFormData.addressLine1,
+          line2: createFormData.addressLine2 || "",
+          city: createFormData.addressCity,
+          state: createFormData.addressState,
+          country: createFormData.addressCountry,
+          zipcode: createFormData.addressZipcode,
+        },
+        nationality: createFormData.nationality,
+        gender: createFormData.gender,
+        passportNumber: createFormData.passportNumber,
+        password: createFormData.password,
       };
+
+      // Only include emiratesIdNumber if provided
+      if (createFormData.emiratesId && createFormData.emiratesId.trim()) {
+        payload.emiratesIdNumber = createFormData.emiratesId;
+      }
+
+      console.log("Sending payload:", payload); // Debug log
+
       await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/user/create-customer`,
         payload,
@@ -257,172 +664,87 @@ export const ManagerCustomersPage: React.FC = () => {
         title: "Success",
         description: "Customer created successfully!",
       });
-      setShowCreateModal(false);
-      setForm({
+      setIsCreateModalOpen(false);
+      setCreateFormData({
         firstName: "",
         middleName: "",
         lastName: "",
         dob: "",
         email: "",
         phoneNumber: "",
-        currentAddress: "",
-        permanentAddress: "",
+        addressLine1: "",
+        addressLine2: "",
+        addressCity: "",
+        addressState: "",
+        addressCountry: "",
+        addressZipcode: "",
         nationality: "",
         gender: "",
-        designation: "",
-        companyType: "",
-        jurisdiction: "",
-        businessActivity1: "",
-        officeType: "",
-        quotedPrice: "",
-        paymentPlans: "",
-        paymentDetails: "",
+        emiratesId: "",
+        passportNumber: "",
         password: "",
       });
-      // Refresh applications list after customer creation
-      fetchApplications();
+      setCreateFormErrors({});
+      setShowCreatePassword(false);
       // Refresh customers list
-      const fetchData = async () => {
-        try {
-          const customersResponse = await fetch(
-            `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (customersResponse.ok) {
-            const customersData = await customersResponse.json();
-            setCustomers(customersData.data);
-          }
-        } catch (error) {
-          console.error("Error refreshing customers:", error);
-        }
-      };
-      fetchData();
+      fetchCustomers();
     } catch (err: any) {
       toast({
         title: "Error",
         description:
-          err?.response?.data?.message || "Failed to create customer.",
+          err?.response?.data?.message || "Failed to create customer",
         variant: "destructive",
       });
     } finally {
-      setCreating(false);
+      setIsCreating(false);
     }
   };
 
-  // Fetch customers and applications from backend
+  // Update edit form when selected customer changes
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          console.log("No token found");
-          return;
-        }
-
-        // Fetch all customers without filtering by agent
-        const customersResponse = await fetch(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (customersResponse.ok) {
-          const customersData = await customersResponse.json();
-          // Set all customers without filtering by assignedAgentId
-          setCustomers(customersData.data);
-
-          if (customersData.data.length > 0) {
-            setSelectedCustomer(customersData.data[0]);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const getCustomerApplications = (customerId: string) => {
-    return applications.filter((app) => {
-      if (!app.customer) return false;
-
-      // Handle populated customer object (from backend populate)
-      if (
-        typeof app.customer === "object" &&
-        app.customer !== null &&
-        "_id" in app.customer
-      ) {
-        return (app.customer as { _id: string })._id === customerId;
-      }
-
-      // Handle customer as string ID
-      if (typeof app.customer === "string") {
-        return app.customer === customerId;
-      }
-
-      return false;
-    });
-  };
-
-  const getCustomerName = (customer: Customer) => {
-    return `${customer.firstName} ${customer.lastName}`;
-  };
-
-  const getCustomerInitials = (customer: Customer) => {
-    return `${customer.firstName[0]}${customer.lastName[0]}`;
-  };
-
-  const getCurrentStep = (app: Application) => {
-    return app.steps.filter(
-      (step) => step.status === "Submitted" || step.status === "Approved"
-    ).length;
-  };
-
-  // Fetch customer documents
-  const fetchCustomerDocuments = async (customerId: string) => {
-    if (!token) return;
-    try {
-      console.log("Fetching documents for customer:", customerId);
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/customer/${customerId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log("Documents response:", response.data);
-      setCustomerDocuments(response.data.data || []);
-    } catch (error) {
-      console.error("Error fetching customer documents:", error);
-      setCustomerDocuments([]);
+    if (selectedCustomer && isEditModalOpen) {
+      setEditFormData({
+        firstName: selectedCustomer.firstName || "",
+        lastName: selectedCustomer.lastName || "",
+        email: selectedCustomer.email || "",
+        phoneNumber: selectedCustomer.phoneNumber || "",
+        nationality: selectedCustomer.nationality || "",
+        password: "",
+      });
+      setEditFormErrors({});
+      setShowEditPassword(false);
     }
-  };
+  }, [selectedCustomer, isEditModalOpen]);
 
+  // Filter customers based on search
   const filteredCustomers = customers.filter(
     (customer) =>
       getCustomerName(customer)
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.customerId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Add state for review note and loading per application
-  const [reviewNotes, setReviewNotes] = useState<{ [appId: string]: string }>(
-    {}
-  );
-  const [reviewLoading, setReviewLoading] = useState<{
-    [appId: string]: boolean;
-  }>({});
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
+  };
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   if (loading) {
     return <PageLoader message="Loading customers..." size="lg" />;
@@ -430,951 +752,1208 @@ export const ManagerCustomersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="">
-          <h1 className="text-3xl font-bold text-primary">
-            Customer Management
-          </h1>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">All Customers</h1>
           <p className="text-muted-foreground">
-            View and manage all customers in the database
+            Overview of all customers across all agents
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          {" "}
-          <span className="">
-            <Plus />
-          </span>
-          Create Customer
-        </Button>
+        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Customer
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Create New Customer</DialogTitle>
+              <p className="">
+                All Fields are mandatory <span className="text-red-500">*</span>
+              </p>
+            </DialogHeader>
+            <form
+              onSubmit={handleCreateCustomer}
+              className="space-y-3 max-h-[70vh] overflow-y-auto"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="firstName"
+                    value={createFormData.firstName}
+                    onChange={handleCreateFormChange}
+                  />
+                  {createFormErrors.firstName && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.firstName}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="middleName">Middle Name</Label>
+                  <Input
+                    name="middleName"
+                    value={createFormData.middleName}
+                    onChange={handleCreateFormChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="lastName"
+                    value={createFormData.lastName}
+                    onChange={handleCreateFormChange}
+                  />
+                  {createFormErrors.lastName && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.lastName}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="dob">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="dob"
+                    type="date"
+                    value={createFormData.dob}
+                    onChange={handleCreateFormChange}
+                  />
+                  {createFormErrors.dob && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.dob}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="email">
+                    Email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={createFormData.email}
+                    onChange={handleCreateFormChange}
+                  />
+                  {createFormErrors.email && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.email}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="phoneNumber">
+                    Phone Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="phoneNumber"
+                    value={createFormData.phoneNumber}
+                    onChange={handleCreateFormChange}
+                  />
+                  {createFormErrors.phoneNumber && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.phoneNumber}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="nationality">
+                    Nationality <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="nationality"
+                    value={createFormData.nationality}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter nationality"
+                  />
+                  {createFormErrors.nationality && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.nationality}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="gender">
+                    Gender <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createFormData.gender}
+                    onValueChange={(value) =>
+                      handleCreateSelectChange("gender", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {createFormErrors.gender && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.gender}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressLine1">
+                    Address Line 1 <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="addressLine1"
+                    value={createFormData.addressLine1}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter address line 1"
+                  />
+                  {createFormErrors.addressLine1 && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressLine1}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressLine2">Address Line 2</Label>
+                  <Input
+                    name="addressLine2"
+                    value={createFormData.addressLine2}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter address line 2 (optional)"
+                  />
+                  {createFormErrors.addressLine2 && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressLine2}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressCity">
+                    City <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="addressCity"
+                    value={createFormData.addressCity}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter city"
+                  />
+                  {createFormErrors.addressCity && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressCity}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressState">
+                    State <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="addressState"
+                    value={createFormData.addressState}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter state"
+                  />
+                  {createFormErrors.addressState && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressState}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressCountry">
+                    Country <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="addressCountry"
+                    value={createFormData.addressCountry}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter country"
+                  />
+                  {createFormErrors.addressCountry && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressCountry}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="addressZipcode">
+                    Zipcode <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="addressZipcode"
+                    value={createFormData.addressZipcode}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter zipcode"
+                  />
+                  {createFormErrors.addressZipcode && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.addressZipcode}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="emiratesId">Emirates ID</Label>
+                  <Input
+                    name="emiratesId"
+                    value={createFormData.emiratesId}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter Emirates ID (optional)"
+                  />
+                  {createFormErrors.emiratesId && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.emiratesId}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="passportNumber">
+                    Passport Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    name="passportNumber"
+                    value={createFormData.passportNumber}
+                    onChange={handleCreateFormChange}
+                    placeholder="Enter passport number"
+                  />
+                  {createFormErrors.passportNumber && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.passportNumber}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="password">
+                    Password <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      name="password"
+                      type={showCreatePassword ? "text" : "password"}
+                      value={createFormData.password}
+                      onChange={handleCreateFormChange}
+                      placeholder="Enter password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    >
+                      {showCreatePassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {createFormErrors.password && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.password}
+                    </span>
+                  )}
+                  {createFormData.password && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            passwordStrength.hasMinLength
+                              ? "bg-green-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                        <span className="text-xs">At least 8 characters</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            passwordStrength.hasCapital
+                              ? "bg-green-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                        <span className="text-xs">One capital letter</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            passwordStrength.hasNumber
+                              ? "bg-green-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                        <span className="text-xs">One number</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            passwordStrength.hasSpecial
+                              ? "bg-green-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                        <span className="text-xs">One special character</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isCreating}
+                  className="font-semibold"
+                >
+                  {isCreating ? "Creating..." : "Create Customer"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-lg">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Customers
+                </p>
+                <p className="text-2xl font-bold">{totalCustomers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <UserCheck className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Active
+                </p>
+                <p className="text-2xl font-bold">{activeCustomers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Pending Assignment
+                </p>
+                <p className="text-2xl font-bold">{pendingAssignment}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <FileCheck className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Applications
+                </p>
+                <p className="text-2xl font-bold">{totalApplications}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Pagination */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search customers..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button variant="outline" size="sm">
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              {itemsPerPage} items per page
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("5")}>
+              5 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("10")}>
+              10 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("20")}>
+              20 items
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleItemsPerPageChange("50")}>
+              50 items
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Customer Directory */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Customer Directory</CardTitle>
+          <CardDescription>Search and manage all customers</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-red-600 mb-2">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {!error && customers.length === 0 && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-muted-foreground">No customers found.</p>
+              </div>
+            </div>
+          )}
+
+          {!error && customers.length > 0 && filteredCustomers.length === 0 && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-muted-foreground">
+                  No customers match your search criteria.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!error && filteredCustomers.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Nationality</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Applications</TableHead>
+                  <TableHead>Assigned Agent</TableHead>
+                  <TableHead>Last Activity</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedCustomers.map((customer) => (
+                  <TableRow key={customer._id}>
+                    <TableCell className="font-medium">
+                      {customer.customerId}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                            {getCustomerInitials(customer)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">
+                            {getCustomerName(customer)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {customer.email}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="text-sm flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {customer.phoneNumber || "N/A"}
+                        </p>
+                        <p className="text-sm flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {customer.email}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{customer.nationality || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          getCustomerStatus(customer) === "active"
+                            ? "default"
+                            : "secondary"
+                        }
+                        className={
+                          getCustomerStatus(customer) === "active"
+                            ? "bg-green-100 text-green-800 border-green-200"
+                            : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                        }
+                      >
+                        {getCustomerStatus(customer)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          {getCustomerApplicationsCount(customer._id)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {customer.assignedAgent ? (
+                        <div>
+                          <div className="font-medium">
+                            {customer.assignedAgent.fullName}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Unassigned
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(customer.createdAt)}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setIsViewModalOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setIsEditModalOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleStatus(customer)}
+                          >
+                            {getCustomerStatus(customer) === "active" ? (
+                              <>
+                                <UserX className="h-4 w-4 mr-2" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to{" "}
+            {Math.min(endIndex, filteredCustomers.length)} of{" "}
+            {filteredCustomers.length} results
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Customer</DialogTitle>
+            <DialogTitle>Edit Customer Details</DialogTitle>
+            <DialogDescription>
+              Update customer information. Email cannot be changed.
+            </DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={handleCreateCustomer}
-            className="space-y-3 max-h-[70vh] overflow-y-auto"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  name="firstName"
-                  value={form.firstName}
-                  onChange={handleFormChange}
-                />
-                {formErrors.firstName && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.firstName}
-                  </span>
-                )}
+          {selectedCustomer && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-firstName">First Name *</Label>
+                  <Input
+                    id="edit-firstName"
+                    value={editFormData.firstName}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        firstName: e.target.value,
+                      })
+                    }
+                    placeholder="Enter first name"
+                    className={editFormErrors.firstName ? "border-red-500" : ""}
+                  />
+                  {editFormErrors.firstName && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {editFormErrors.firstName}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="edit-lastName">Last Name *</Label>
+                  <Input
+                    id="edit-lastName"
+                    value={editFormData.lastName}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        lastName: e.target.value,
+                      })
+                    }
+                    placeholder="Enter last name"
+                    className={editFormErrors.lastName ? "border-red-500" : ""}
+                  />
+                  {editFormErrors.lastName && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {editFormErrors.lastName}
+                    </p>
+                  )}
+                </div>
               </div>
               <div>
-                <Label htmlFor="middleName">Middle Name</Label>
+                <Label htmlFor="edit-email">Email Address</Label>
                 <Input
-                  name="middleName"
-                  value={form.middleName}
-                  onChange={handleFormChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  name="lastName"
-                  value={form.lastName}
-                  onChange={handleFormChange}
-                />
-                {formErrors.lastName && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.lastName}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="dob">Date of Birth</Label>
-                <Input
-                  name="dob"
-                  type="date"
-                  value={form.dob}
-                  onChange={handleFormChange}
-                />
-                {formErrors.dob && (
-                  <span className="text-xs text-red-500">{formErrors.dob}</span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  name="email"
+                  id="edit-email"
                   type="email"
-                  value={form.email}
-                  onChange={handleFormChange}
+                  value={editFormData.email}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
+                  placeholder="Email address (read-only)"
                 />
-                {formErrors.email && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.email}
-                  </span>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email address cannot be changed
+                </p>
               </div>
               <div>
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="edit-phone">Phone Number *</Label>
                 <Input
-                  name="phoneNumber"
-                  value={form.phoneNumber}
-                  onChange={handleFormChange}
-                />
-                {formErrors.phoneNumber && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.phoneNumber}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="currentAddress">Current Address</Label>
-                <Input
-                  name="currentAddress"
-                  value={form.currentAddress}
-                  onChange={handleFormChange}
-                />
-                {formErrors.currentAddress && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.currentAddress}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="permanentAddress">Permanent Address</Label>
-                <Input
-                  name="permanentAddress"
-                  value={form.permanentAddress}
-                  onChange={handleFormChange}
-                />
-                {formErrors.permanentAddress && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.permanentAddress}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="nationality">Nationality</Label>
-                <Input
-                  name="nationality"
-                  value={form.nationality}
-                  onChange={handleFormChange}
-                />
-                {formErrors.nationality && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.nationality}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="gender">Gender</Label>
-                <Select
-                  value={form.gender}
-                  onValueChange={(value) => handleSelectChange("gender", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                    <SelectItem value="prefer-not-to-say">
-                      Prefer not to say
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.gender && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.gender}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="designation">Designation</Label>
-                <Input
-                  name="designation"
-                  value={form.designation}
-                  onChange={handleFormChange}
-                />
-                {formErrors.designation && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.designation}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="companyType">Company Type</Label>
-                <Input
-                  name="companyType"
-                  value={form.companyType}
-                  onChange={handleFormChange}
-                />
-                {formErrors.companyType && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.companyType}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                <Select
-                  value={form.jurisdiction}
-                  onValueChange={(value) =>
-                    handleSelectChange("jurisdiction", value)
+                  id="edit-phone"
+                  value={editFormData.phoneNumber}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      phoneNumber: e.target.value,
+                    })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select jurisdiction" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mainland">Mainland</SelectItem>
-                    <SelectItem value="freezone">Freezone</SelectItem>
-                    <SelectItem value="offshore">Offshore</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.jurisdiction && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.jurisdiction}
-                  </span>
+                  placeholder="+971-XX-XXX-XXXX"
+                  className={editFormErrors.phoneNumber ? "border-red-500" : ""}
+                />
+                {editFormErrors.phoneNumber && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.phoneNumber}
+                  </p>
                 )}
               </div>
               <div>
-                <Label htmlFor="businessActivity1">Business Activity</Label>
+                <Label htmlFor="edit-nationality">Nationality *</Label>
                 <Input
-                  name="businessActivity1"
-                  value={form.businessActivity1}
-                  onChange={handleFormChange}
+                  id="edit-nationality"
+                  value={editFormData.nationality}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      nationality: e.target.value,
+                    })
+                  }
+                  placeholder="Enter nationality"
+                  className={editFormErrors.nationality ? "border-red-500" : ""}
                 />
-                {formErrors.businessActivity1 && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.businessActivity1}
-                  </span>
+                {editFormErrors.nationality && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.nationality}
+                  </p>
                 )}
               </div>
               <div>
-                <Label htmlFor="officeType">Office Type</Label>
-                <Input
-                  name="officeType"
-                  value={form.officeType}
-                  onChange={handleFormChange}
-                />
-                {formErrors.officeType && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.officeType}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="quotedPrice">Quoted Price</Label>
-                <Input
-                  name="quotedPrice"
-                  value={form.quotedPrice}
-                  onChange={handleFormChange}
-                />
-                {formErrors.quotedPrice && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.quotedPrice}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="paymentPlans">Payment Plans</Label>
-                <Input
-                  name="paymentPlans"
-                  value={form.paymentPlans}
-                  onChange={handleFormChange}
-                />
-                {formErrors.paymentPlans && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.paymentPlans}
-                  </span>
-                )}
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="paymentDetails">Payment Details</Label>
-                <Textarea
-                  name="paymentDetails"
-                  value={form.paymentDetails}
-                  onChange={handleFormChange}
-                />
-                {formErrors.paymentDetails && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.paymentDetails}
-                  </span>
-                )}
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="edit-password">New Password (Optional)</Label>
                 <div className="relative">
                   <Input
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={handleFormChange}
-                    className="pr-10"
+                    id="edit-password"
+                    type={showEditPassword ? "text" : "password"}
+                    value={editFormData.password}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        password: e.target.value,
+                      })
+                    }
+                    placeholder="Leave blank to keep current password"
+                    className={`pr-10 ${
+                      editFormErrors.password ? "border-red-500" : ""
+                    }`}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowEditPassword(!showEditPassword)}
                   >
-                    {showPassword ? (
+                    {showEditPassword ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
                       <Eye className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
-                {/* Password Strength Indicator */}
-                {form.password && (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      Password strength requirements:
-                    </div>
-                    <div className="space-y-1">
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasCapital
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasCapital
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Capital letter (A-Z)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasNumber
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasNumber
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Number (0-9)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasSpecial
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasSpecial
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Special character (!@#$%^&*)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasMinLength
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasMinLength
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Minimum 8 characters
-                      </div>
-                    </div>
-                    {passwordStrength.isStrong && (
-                      <div className="text-xs text-green-600 font-medium">
-                        ✓ Password is strong!
-                      </div>
-                    )}
-                  </div>
+                {editFormErrors.password && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {editFormErrors.password}
+                  </p>
                 )}
-                {formErrors.password && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.password}
-                  </span>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Leave blank to keep the current password
+                </p>
               </div>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowCreateModal(false)}
-                disabled={creating}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={creating}
-                className="font-semibold"
-              >
-                {creating ? "Creating..." : "Create Customer"}
-              </Button>
-            </DialogFooter>
-          </form>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditCustomer}
+              disabled={isUpdating}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isUpdating ? "Updating..." : "Update Customer"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Customers List */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Customers ({customers.length})</CardTitle>
-            <CardDescription>All customers in the database</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search customers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {filteredCustomers.map((customer) => {
-                const customerApps = getCustomerApplications(customer._id);
-                return (
-                  <div
-                    key={customer._id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCustomer?._id === customer._id
-                        ? "border-primary bg-primary/5"
-                        : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => {
-                      setSelectedCustomer(customer);
-                      fetchCustomerDocuments(customer._id);
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                          {getCustomerInitials(customer)}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {getCustomerName(customer)}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {customer.email}
-                        </p>
-                        <div className="flex items-center mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {customerApps.length} Apps
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Customer Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {selectedCustomer && (
+      {/* Status Confirmation Modal */}
+      <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
+        <DialogContent>
+          {customerToToggle && (
             <>
-              {/* Customer Profile */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-16 h-16">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                          {getCustomerInitials(selectedCustomer)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <CardTitle>
-                          {getCustomerName(selectedCustomer)}
-                        </CardTitle>
-                        <CardDescription>
-                          Customer since{" "}
-                          {new Date(
-                            selectedCustomer.createdAt
-                          ).toLocaleDateString()}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <strong>First Name:</strong>{" "}
-                      {selectedCustomer.firstName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Middle Name:</strong>{" "}
-                      {selectedCustomer.middleName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Last Name:</strong>{" "}
-                      {selectedCustomer.lastName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Date of Birth:</strong>{" "}
-                      {selectedCustomer.dob
-                        ? new Date(selectedCustomer.dob).toLocaleDateString()
-                        : "N/A"}
-                    </div>
-                    <div>
-                      <strong>Email:</strong> {selectedCustomer.email || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Phone Number:</strong>{" "}
-                      {selectedCustomer.phoneNumber || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Current Address:</strong>{" "}
-                      {selectedCustomer.currentAddress || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Permanent Address:</strong>{" "}
-                      {selectedCustomer.permanentAddress || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Nationality:</strong>{" "}
-                      {selectedCustomer.nationality || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Gender:</strong>{" "}
-                      {selectedCustomer.gender || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Designation:</strong>{" "}
-                      {selectedCustomer.designation || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Company Type:</strong>{" "}
-                      {selectedCustomer.companyType || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Jurisdiction:</strong>{" "}
-                      {selectedCustomer.jurisdiction || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Business Activity:</strong>{" "}
-                      {selectedCustomer.businessActivity1 || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Office Type:</strong>{" "}
-                      {selectedCustomer.officeType || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Quoted Price:</strong>{" "}
-                      {selectedCustomer.quotedPrice || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Payment Plans:</strong>{" "}
-                      {selectedCustomer.paymentPlans
-                        ? Array.isArray(selectedCustomer.paymentPlans)
-                          ? selectedCustomer.paymentPlans.join(", ")
-                          : selectedCustomer.paymentPlans
-                        : "N/A"}
-                    </div>
-                    <div className="md:col-span-2">
-                      <strong>Payment Details:</strong>{" "}
-                      {selectedCustomer.paymentDetails || "N/A"}
-                    </div>
-
-                    <div>
-                      <strong>Created At:</strong>{" "}
-                      {selectedCustomer.createdAt
-                        ? new Date(
-                            selectedCustomer.createdAt
-                          ).toLocaleDateString()
-                        : "N/A"}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Customer Documents */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Uploaded Documents
-                  </CardTitle>
-                  <CardDescription>
-                    Documents uploaded by the customer
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Debug info */}
-                    <div className="text-xs text-gray-500 mb-2">
-                      Total documents: {customerDocuments.length}
-                      {customerDocuments.length > 0 && (
-                        <div>
-                          Document types:{" "}
-                          {customerDocuments
-                            .map((doc) => doc.documentType)
-                            .join(", ")}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Local Proof */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Local Proof
-                      </h4>
-                      {(() => {
-                        const localProofDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "local-proof"
-                        );
-                        return localProofDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-blue-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {localProofDoc.documentName || "Local Proof"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    localProofDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(localProofDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No local proof uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Passport Photo */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Passport Photo
-                      </h4>
-                      {(() => {
-                        const passportPhotoDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "passport-photo"
-                        );
-                        return passportPhotoDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-green-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {passportPhotoDoc.documentName ||
-                                    "Passport Photo"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    passportPhotoDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(passportPhotoDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No passport photo uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Bank Statement */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Bank Statement
-                      </h4>
-                      {(() => {
-                        const bankStatementDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "bank-statement"
-                        );
-                        return bankStatementDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-purple-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {bankStatementDoc.documentName ||
-                                    "Bank Statement"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    bankStatementDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(bankStatementDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No bank statement uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Applications List for Selected Customer */}
-              <>
-                <CardContent>
-                  <div className="space-y-4">
-                    {getCustomerApplications(selectedCustomer._id).length ===
-                    0 ? (
-                      <div className="text-muted-foreground">
-                        No applications found.
-                      </div>
-                    ) : (
-                      getCustomerApplications(selectedCustomer._id).map(
-                        (app) => (
-                          <div
-                            key={app._id}
-                            className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-sm font-medium">
-                                  Application ID:
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {app._id}
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${
-                                    app.status === "New" ||
-                                    app.status === "Ready for Processing"
-                                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                                      : app.status === "In Progress" ||
-                                        app.status ===
-                                          "Waiting for Agent Review"
-                                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                      : app.status === "Completed" ||
-                                        app.status === "Approved"
-                                      ? "bg-green-100 text-green-800 border-green-200"
-                                      : app.status === "Rejected" ||
-                                        app.status === "Declined"
-                                      ? "bg-red-100 text-red-800 border-red-200"
-                                      : app.status ===
-                                        "Awaiting Client Response"
-                                      ? "bg-orange-100 text-orange-800 border-orange-200"
-                                      : "bg-gray-100 text-gray-800 border-gray-200"
-                                  }`}
-                                >
-                                  {app.status}
-                                </Badge>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Created:{" "}
-                                {new Date(app.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 min-w-[220px]">
-                              <Textarea
-                                placeholder="Add a note (optional)"
-                                value={reviewNotes[app._id] || ""}
-                                onChange={(e) =>
-                                  setReviewNotes((prev) => ({
-                                    ...prev,
-                                    [app._id]: e.target.value,
-                                  }))
-                                }
-                                className="min-h-[36px]"
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  disabled={reviewLoading[app._id]}
-                                  onClick={async () => {
-                                    setReviewLoading((prev) => ({
-                                      ...prev,
-                                      [app._id]: true,
-                                    }));
-                                    try {
-                                      await axios.patch(
-                                        `${
-                                          import.meta.env.VITE_BASE_URL
-                                        }/api/application/review-after-onboarding/${
-                                          app._id
-                                        }`,
-                                        {
-                                          decision: "approve",
-                                          note: reviewNotes[app._id] || "",
-                                        },
-                                        {
-                                          headers: {
-                                            Authorization: `Bearer ${token}`,
-                                          },
-                                        }
-                                      );
-                                      toast({
-                                        title: "Success",
-                                        description:
-                                          "Application marked as Ready for Processing",
-                                      });
-                                      fetchApplications();
-                                    } catch (err: any) {
-                                      console.error(
-                                        "Review error (approve):",
-                                        err?.response || err
-                                      );
-                                      toast({
-                                        title: "Error",
-                                        description:
-                                          err?.response?.data?.message ||
-                                          "Failed to review application.",
-                                        variant: "destructive",
-                                      });
-                                    } finally {
-                                      setReviewLoading((prev) => ({
-                                        ...prev,
-                                        [app._id]: false,
-                                      }));
-                                    }
-                                  }}
-                                >
-                                  {reviewLoading[app._id]
-                                    ? "Approving..."
-                                    : "Approve"}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={reviewLoading[app._id]}
-                                  onClick={async () => {
-                                    setReviewLoading((prev) => ({
-                                      ...prev,
-                                      [app._id]: true,
-                                    }));
-                                    try {
-                                      await axios.patch(
-                                        `${
-                                          import.meta.env.VITE_BASE_URL
-                                        }/api/application/review-after-onboarding/${
-                                          app._id
-                                        }`,
-                                        {
-                                          decision: "clarify",
-                                          note: reviewNotes[app._id] || "",
-                                        },
-                                        {
-                                          headers: {
-                                            Authorization: `Bearer ${token}`,
-                                          },
-                                        }
-                                      );
-                                      toast({
-                                        title: "Success",
-                                        description:
-                                          "Clarification requested from customer",
-                                      });
-                                      fetchApplications();
-                                    } catch (err: any) {
-                                      console.error(
-                                        "Review error (clarify):",
-                                        err?.response || err
-                                      );
-                                      toast({
-                                        title: "Error",
-                                        description:
-                                          err?.response?.data?.message ||
-                                          "Failed to review application.",
-                                        variant: "destructive",
-                                      });
-                                    } finally {
-                                      setReviewLoading((prev) => ({
-                                        ...prev,
-                                        [app._id]: false,
-                                      }));
-                                    }
-                                  }}
-                                >
-                                  {reviewLoading[app._id]
-                                    ? "Requesting..."
-                                    : "Clarify"}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      )
-                    )}
-                  </div>
-                </CardContent>
-              </>
+              <DialogHeader>
+                <DialogTitle>
+                  {getCustomerStatus(customerToToggle) === "active"
+                    ? "Deactivate Customer"
+                    : "Activate Customer"}
+                </DialogTitle>
+                <DialogDescription>
+                  {getCustomerStatus(customerToToggle) === "active"
+                    ? `Are you sure you want to deactivate ${getCustomerName(
+                        customerToToggle
+                      )}? This will prevent them from accessing the system.`
+                    : `Are you sure you want to activate ${getCustomerName(
+                        customerToToggle
+                      )}? This will restore their access to the system.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsStatusModalOpen(false);
+                    setCustomerToToggle(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmToggleStatus}
+                  disabled={isUpdating}
+                  variant={
+                    getCustomerStatus(customerToToggle) === "active"
+                      ? "destructive"
+                      : "default"
+                  }
+                  className={
+                    getCustomerStatus(customerToToggle) === "active"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : ""
+                  }
+                >
+                  {isUpdating
+                    ? "Updating..."
+                    : getCustomerStatus(customerToToggle) === "active"
+                    ? "Deactivate"
+                    : "Activate"}
+                </Button>
+              </DialogFooter>
             </>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Customer Profile Modal */}
+      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Customer Information</DialogTitle>
+            <DialogDescription>
+              Complete customer profile and application details
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCustomer && (
+            <div className="space-y-6">
+              {/* Customer Info Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary">
+                  Customer Info
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Customer ID</Label>
+                    <p className="font-medium">{selectedCustomer.customerId}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Full Name</Label>
+                    <p className="font-medium">
+                      {getCustomerName(selectedCustomer)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Created Date
+                    </Label>
+                    <p className="font-medium">
+                      {formatDate(selectedCustomer.createdAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Last Activity Date
+                    </Label>
+                    <p className="font-medium">
+                      {formatDate(
+                        selectedCustomer.updatedAt || selectedCustomer.createdAt
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="font-medium">{selectedCustomer.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Phone Number
+                    </Label>
+                    <p className="font-medium">
+                      {selectedCustomer.phoneNumber || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Nationality</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.nationality || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Emirates ID</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.emiratesIdNumber || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Passport Number
+                    </Label>
+                    <p className="font-medium">
+                      {selectedCustomer.passportNumber || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Status</Label>
+                    <Badge
+                      variant={
+                        getCustomerStatus(selectedCustomer) === "active"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className={
+                        getCustomerStatus(selectedCustomer) === "active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }
+                    >
+                      {getCustomerStatus(selectedCustomer)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Assigned Agent
+                    </Label>
+                    <p className="font-medium">
+                      {selectedCustomer.assignedAgent
+                        ? selectedCustomer.assignedAgent.fullName
+                        : "Unassigned"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary">Address</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Address Line 1
+                    </Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.line1 || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">
+                      Address Line 2
+                    </Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.line2 || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">City</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.city || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">State</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.state || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Country</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.country || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Zipcode</Label>
+                    <p className="font-medium">
+                      {selectedCustomer.address?.zipcode || "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Applications Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary">
+                  Applications
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-muted-foreground">
+                        Total Applications
+                      </Label>
+                      <p className="font-medium text-lg">
+                        {getCustomerApplicationsCount(selectedCustomer._id)}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">
+                        Application Status
+                      </Label>
+                      <div className="flex gap-2 mt-1">
+                        {(() => {
+                          const customerApps = applications.filter((app) => {
+                            if (typeof app.customer === "string") {
+                              return app.customer === selectedCustomer._id;
+                            }
+                            if (
+                              typeof app.customer === "object" &&
+                              app.customer !== null
+                            ) {
+                              return (
+                                (app.customer as any)._id ===
+                                selectedCustomer._id
+                              );
+                            }
+                            return false;
+                          });
+
+                          const statusCounts = customerApps.reduce(
+                            (acc, app) => {
+                              acc[app.status] = (acc[app.status] || 0) + 1;
+                              return acc;
+                            },
+                            {} as { [key: string]: number }
+                          );
+
+                          return Object.entries(statusCounts).map(
+                            ([status, count]) => (
+                              <Badge
+                                key={status}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {status}: {count}
+                              </Badge>
+                            )
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Application List */}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      Application Details
+                    </Label>
+                    {(() => {
+                      const customerApps = applications.filter((app) => {
+                        if (typeof app.customer === "string") {
+                          return app.customer === selectedCustomer._id;
+                        }
+                        if (
+                          typeof app.customer === "object" &&
+                          app.customer !== null
+                        ) {
+                          return (
+                            (app.customer as any)._id === selectedCustomer._id
+                          );
+                        }
+                        return false;
+                      });
+
+                      if (customerApps.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            No applications found
+                          </p>
+                        );
+                      }
+
+                      return customerApps.map((app, index) => (
+                        <div
+                          key={app._id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">
+                              Application {index + 1}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Created: {formatDate(app.createdAt)}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              app.status === "New" ||
+                              app.status === "Ready for Processing"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : app.status === "In Progress" ||
+                                  app.status === "Waiting for Agent Review"
+                                ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                : app.status === "Completed" ||
+                                  app.status === "Approved"
+                                ? "bg-green-100 text-green-800 border-green-200"
+                                : app.status === "Rejected" ||
+                                  app.status === "Declined"
+                                ? "bg-red-100 text-red-800 border-red-200"
+                                : app.status === "Awaiting Client Response"
+                                ? "bg-orange-100 text-orange-800 border-orange-200"
+                                : "bg-gray-100 text-gray-800 border-gray-200"
+                            }
+                          >
+                            {app.status}
+                          </Badge>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

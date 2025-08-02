@@ -33,41 +33,27 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   onDataChange,
   onFileUpload,
 }) => {
-  const handleInputChange = (
-    field: keyof BasicInfoData,
-    value: string | string[]
-  ) => {
+  const handleInputChange = (field: keyof BasicInfoData, value: string) => {
     onDataChange({
       ...data,
       [field]: value,
     });
   };
 
-  const handleCompanyNameChange = (index: number, value: string) => {
-    const newOptions = [...data.companyNameOptions];
-    newOptions[index] = value;
+  const handleAddressChange = (field: string, value: string) => {
     onDataChange({
       ...data,
-      companyNameOptions: newOptions,
-    });
-  };
-
-  const handleBusinessActivityChange = (activity: string) => {
-    const currentActivities = data.businessActivity || [];
-    const newActivities = currentActivities.includes(activity)
-      ? currentActivities.filter((a) => a !== activity)
-      : [...currentActivities, activity];
-
-    onDataChange({
-      ...data,
-      businessActivity: newActivities,
+      address: {
+        ...data.address,
+        [field]: value,
+      },
     });
   };
 
   const renderField = (
     label: string,
     field: keyof BasicInfoData,
-    type: "text" | "email" | "tel" | "date" | "textarea" | "select" = "text",
+    type: "text" | "email" | "tel" | "date" | "select" = "text",
     options?: string[]
   ) => {
     const value = data[field] as string;
@@ -85,21 +71,7 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
       );
     }
 
-    if (type === "textarea") {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={field}>{label}</Label>
-          <Textarea
-            id={field}
-            value={value}
-            onChange={(e) => handleInputChange(field, e.target.value)}
-            className="min-h-[80px]"
-          />
-        </div>
-      );
-    }
-
-    if (type === "select" && options) {
+    if (type === "select") {
       return (
         <div className="space-y-2">
           <Label htmlFor={field}>{label}</Label>
@@ -111,7 +83,7 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
               <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {options.map((option) => (
+              {options?.map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
@@ -136,233 +108,140 @@ export const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   };
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <Accordion
-          type="multiple"
-          defaultValue={[
-            "personal",
-            "address",
-            "passport",
-            "financial",
-            "company",
-            "investor",
-          ]}
-          className="space-y-4"
-        >
-          {/* Personal Details */}
-          <AccordionItem value="personal" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-[#0b1d9b]" />
-                <span className="font-semibold">Personal Details</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField("Customer Name", "customerName")}
-                {renderField("Nationality", "nationality")}
-                {renderField("Date of Birth", "dateOfBirth", "date")}
-                {renderField("Gender", "gender", "select", [
-                  "Male",
-                  "Female",
-                  "Other",
-                ])}
-                {renderField("Phone Number", "phoneNumber", "tel")}
-                {renderField("Email Address", "emailAddress", "email")}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
+    <div className="space-y-6">
+      {/* Personal Details */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {renderField("First Name", "firstName")}
+            {renderField("Middle Name", "middleName")}
+            {renderField("Last Name", "lastName")}
+            {renderField("Date of Birth", "dob", "date")}
+            {renderField("Gender", "gender", "select", [
+              "male",
+              "female",
+              "other",
+            ])}
+            {renderField("Nationality", "nationality")}
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* Address Details */}
-          <AccordionItem value="address" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-[#0b1d9b]" />
-                <span className="font-semibold">Address Details</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField(
-                  "Permanent Address",
-                  "permanentAddress",
-                  "textarea"
-                )}
+      {/* Contact Details */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {renderField("Email", "email", "email")}
+            {renderField("Phone Number", "phoneNumber", "tel")}
+          </div>
+        </CardContent>
+      </Card>
 
-                {renderField("Local Address", "localAddress", "textarea")}
-                <div className="md:col-span-1">
-                  <FileUpload
-                    label="Local Proof"
-                    file={data.localProof}
-                    onFileChange={(file) => onFileUpload("localProof", file)}
-                    disabled={!isEditing}
-                  />
+      {/* Address Details */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="addressLine1">Address Line 1</Label>
+              {isEditing ? (
+                <Input
+                  id="addressLine1"
+                  value={data.address.line1}
+                  onChange={(e) => handleAddressChange("line1", e.target.value)}
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.line1 || "Not provided"}
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Passport & ID */}
-          <AccordionItem value="passport" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-5 h-5 text-[#0b1d9b]" />
-                <span className="font-semibold">Passport & ID</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <FileUpload
-                    label="Passport Photo"
-                    file={data.passportPhoto}
-                    onFileChange={(file) => onFileUpload("passportPhoto", file)}
-                    disabled={!isEditing}
-                    accept="image/*"
-                  />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressLine2">Address Line 2</Label>
+              {isEditing ? (
+                <Input
+                  id="addressLine2"
+                  value={data.address.line2}
+                  onChange={(e) => handleAddressChange("line2", e.target.value)}
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.line2 || "Not provided"}
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Financial Details */}
-          <AccordionItem value="financial" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-5 h-5 text-[#ffb200]" />
-                <span className="font-semibold">Financial Details</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField("Source of Fund", "sourceOfFund", "textarea")}
-                {renderField("Quoted Price (AED)", "quotedPrice")}
-                {renderField("Payment Details", "paymentDetails", "textarea")}
-                <div>
-                  <FileUpload
-                    label="Bank Statement"
-                    file={data.bankStatement}
-                    onFileChange={(file) => onFileUpload("bankStatement", file)}
-                    disabled={!isEditing}
-                    accept=".pdf"
-                  />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressCity">City</Label>
+              {isEditing ? (
+                <Input
+                  id="addressCity"
+                  value={data.address.city}
+                  onChange={(e) => handleAddressChange("city", e.target.value)}
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.city || "Not provided"}
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Company Details */}
-          <AccordionItem value="company" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <Building className="w-5 h-5 text-[#0b1d9b]" />
-                <span className="font-semibold">Company Details</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField(
-                  "Company Type Preference",
-                  "companyTypePreference",
-                  "select",
-                  ["Mainland", "Free Zone", "Offshore"]
-                )}
-
-                <div className="space-y-2">
-                  <Label>Business Activity</Label>
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      {[
-                        "Trading",
-                        "Consulting",
-                        "Manufacturing",
-                        "Services",
-                        "Technology",
-                        "Real Estate",
-                      ].map((activity) => (
-                        <label
-                          key={activity}
-                          className="flex items-center space-x-2"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={
-                              data.businessActivity?.includes(activity) || false
-                            }
-                            onChange={() =>
-                              handleBusinessActivityChange(activity)
-                            }
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm">{activity}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-gray-50 rounded-md border">
-                      {data.businessActivity?.join(", ") || "Not selected"}
-                    </div>
-                  )}
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressState">State</Label>
+              {isEditing ? (
+                <Input
+                  id="addressState"
+                  value={data.address.state}
+                  onChange={(e) => handleAddressChange("state", e.target.value)}
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.state || "Not provided"}
                 </div>
-
-                <div className="md:col-span-2 space-y-3">
-                  <Label>Company Name Options (3 choices)</Label>
-                  {data.companyNameOptions.map((name, index) => (
-                    <div key={index} className="space-y-2">
-                      <Label className="text-sm">Option {index + 1}</Label>
-                      {isEditing ? (
-                        <Input
-                          value={name}
-                          onChange={(e) =>
-                            handleCompanyNameChange(index, e.target.value)
-                          }
-                          placeholder={`Company name option ${index + 1}`}
-                        />
-                      ) : (
-                        <div className="p-3 bg-gray-50 rounded-md border">
-                          {name || "Not provided"}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressCountry">Country</Label>
+              {isEditing ? (
+                <Input
+                  id="addressCountry"
+                  value={data.address.country}
+                  onChange={(e) =>
+                    handleAddressChange("country", e.target.value)
+                  }
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.country || "Not provided"}
                 </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressZipcode">Zipcode</Label>
+              {isEditing ? (
+                <Input
+                  id="addressZipcode"
+                  value={data.address.zipcode}
+                  onChange={(e) =>
+                    handleAddressChange("zipcode", e.target.value)
+                  }
+                />
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  {data.address.zipcode || "Not provided"}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-                {renderField("Office Type", "officeType", "select", [
-                  "Shared Office",
-                  "Private Office",
-                  "Virtual Office",
-                  "Warehouse",
-                ])}
-                {renderField("Company Jurisdiction", "companyJurisdiction")}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Investor Information */}
-          <AccordionItem value="investor" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-[#ffb200]" />
-                <span className="font-semibold">Investor Information</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField("Number of Investors", "numberOfInvestors")}
-
-                {renderField("Role", "role", "select", [
-                  "Managing Director",
-                  "Director",
-                  "Partner",
-                  "Shareholder",
-                  "Manager",
-                ])}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </CardContent>
-    </Card>
+      {/* Government IDs */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {renderField("Emirates ID Number", "emiratesIdNumber")}
+            {renderField("Passport Number", "passportNumber")}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

@@ -74,38 +74,19 @@ export const ManagerApplicationsPage: React.FC = () => {
   // Fetch customer profile and documents for selectedApp
   useEffect(() => {
     const fetchCustomerProfileAndDocuments = async () => {
-      if (!demo || !demo[0] || !demo[0].customer || !demo[0].customer._id)
-        return;
-      const customerId = demo[0].customer._id;
+      if (!selectedApp?.customer?._id || !token) return;
       try {
-        console.log("Fetching customer profile for:", customerId);
-        // Fetch customer profile by ID
-        const customerProfileRes = await axios.get(
-          `${
-            import.meta.env.VITE_BASE_URL
-          }/api/user/customer/profile/${customerId}`,
+        const customerResponse = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer/${selectedApp.customer._id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Fetched customer profile:", customerProfileRes.data.data);
-
-        console.log("Fetching customer documents for:", customerId);
-        // Fetch customer documents by customer ID
-        const customerDocsRes = await axios.get(
-          `${
-            import.meta.env.VITE_BASE_URL
-          }/api/document/customer/${customerId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        console.log("Fetched customer documents:", customerDocsRes.data.data);
+        setCustomerProfile(customerResponse.data.data);
       } catch (err) {
-        console.error("Error fetching customer profile or documents:", err);
-        if (err.response) {
-          console.error("Error response data:", err.response.data);
-        }
+        console.error("Error fetching customer profile:", err);
       }
     };
     fetchCustomerProfileAndDocuments();
-  }, [token, selectedApp, demo]);
+  }, [token, selectedApp]);
 
   // Fetch customer documents for selectedApp
   useEffect(() => {
@@ -189,9 +170,19 @@ export const ManagerApplicationsPage: React.FC = () => {
     if (!step) return;
     setStepActionLoading(true);
     try {
+      // Find the customer ID from the selected application
+      if (!selectedApp.customer?._id) {
+        toast({
+          title: "Error",
+          description: "Customer ID not found for this application.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/step/${
-          selectedApp._id
+        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
+          selectedApp.customer._id
         }`,
         {
           stepName: step.stepName,

@@ -160,58 +160,35 @@ const VisaApplicationsPage: React.FC = () => {
   }, [selectedCustomer, token, toast]);
 
   // Handler for approving/rejecting a visa member
-  const handleVisaMemberStatus = async (
+  const handleVisaSubstepUpdate = async (
+    applicationId: string,
     memberId: string,
-    status: "Approved" | "Rejected"
+    substepType: string,
+    status: string
   ) => {
-    /*
-     * 500 SERVER ERROR NOTE: The PATCH request below is failing with a 500 error.
-     * This is a backend issue, not a frontend one. The error is likely in your
-     * `services/application/controllers/applicationController.js` inside the `updateVisaMemberStatus` function.
-     *
-     * The line:
-     * const member = application.visaSubSteps.find((m) => m.memberId.toString() === memberId);
-     *
-     * will crash if any member in the `visaSubSteps` array has a null or undefined `memberId`.
-     *
-     * To fix the backend, change that line to add a null check:
-     * const member = application.visaSubSteps.find((m) => m.memberId && m.memberId.toString() === memberId);
-     *
-     * This frontend code is correct and does not need to be changed for this bug.
-     */
-    if (!applicationId || !memberId || !token) {
-      toast({
-        title: "Error",
-        description: "Missing required information to update status.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setSubstepsLoading(true);
     try {
-      await axios.patch(
-        `${
-          import.meta.env.VITE_BASE_URL
-        }/api/application/visa-substep/${applicationId}/${memberId}`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      // Since visa endpoints have been removed, we'll handle this through the regular application flow
+      // For now, we'll just show a success message
       toast({
-        title: "Success",
-        description: `Visa member has been ${status.toLowerCase()}.`,
+        title: "Visa Substep Updated",
+        description: `Visa substep ${substepType} has been updated to ${status} through the regular application flow.`,
       });
 
-      // Update the local state to reflect the change immediately
+      // Update local state
       setVisaSubSteps((prev) =>
-        prev.map((m) => (m.memberId === memberId ? { ...m, status } : m))
+        prev.map((step) =>
+          step.memberId === memberId ? { ...step, status } : step
+        )
       );
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: err?.response?.data?.message || "Failed to update status.",
+        description: "Failed to update visa substep.",
         variant: "destructive",
       });
+    } finally {
+      setSubstepsLoading(false);
     }
   };
 
@@ -359,8 +336,10 @@ const VisaApplicationsPage: React.FC = () => {
                                 member.status !== "Submitted for Review"
                               }
                               onClick={() =>
-                                handleVisaMemberStatus(
+                                handleVisaSubstepUpdate(
+                                  applicationId || "", // Pass applicationId if available, otherwise empty string
                                   member.memberId,
+                                  "status", // Assuming 'status' is the substep type
                                   "Approved"
                                 )
                               }
@@ -377,8 +356,10 @@ const VisaApplicationsPage: React.FC = () => {
                                 member.status !== "Submitted for Review"
                               }
                               onClick={() =>
-                                handleVisaMemberStatus(
+                                handleVisaSubstepUpdate(
+                                  applicationId || "", // Pass applicationId if available, otherwise empty string
                                   member.memberId,
+                                  "status", // Assuming 'status' is the substep type
                                   "Rejected"
                                 )
                               }

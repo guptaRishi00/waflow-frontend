@@ -27,77 +27,51 @@ import { RootState } from "@/app/store";
 
 export interface BasicInfoData {
   // Personal Details
-  customerName: string;
-  nationality: string;
-  dateOfBirth: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  dob: string;
   gender: string;
+  nationality: string;
+
+  // Contact Details
+  email: string;
   phoneNumber: string;
-  emailAddress: string;
 
   // Address Details
-  permanentAddress: string;
-  countryOfResidence: string;
-  localAddress: string;
-  localProof?: File;
+  address: {
+    line1: string;
+    line2: string;
+    city: string;
+    state: string;
+    country: string;
+    zipcode: string;
+  };
 
-  // Passport & ID
+  // Government IDs
+  emiratesIdNumber: string;
   passportNumber: string;
-  passportExpiry: string;
-  emiratesId: string;
-  residenceVisa: string;
-  passportPhoto?: File;
-
-  // Financials
-  sourceOfFund: string;
-  bankStatement?: File;
-  quotedPrice: string;
-  paymentDetails: string;
-
-  // Company Details
-  companyTypePreference: string;
-  businessActivity: string[];
-  companyNameOptions: string[];
-  officeType: string;
-  companyJurisdiction: string;
-  finalCompanyName: string;
-
-  // Investor Info
-  investorName: string;
-  numberOfInvestors: string;
-  investorPercentage: string;
-  role: string;
 }
 
 const emptyBasicInfo: BasicInfoData = {
-  customerName: "",
-  nationality: "",
-  dateOfBirth: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  dob: "",
   gender: "",
+  nationality: "",
+  email: "",
   phoneNumber: "",
-  emailAddress: "",
-  permanentAddress: "",
-  countryOfResidence: "",
-  localAddress: "",
-  localProof: undefined,
+  address: {
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    country: "",
+    zipcode: "",
+  },
+  emiratesIdNumber: "",
   passportNumber: "",
-  passportExpiry: "",
-  emiratesId: "",
-  residenceVisa: "",
-  passportPhoto: undefined,
-  sourceOfFund: "",
-  bankStatement: undefined,
-  quotedPrice: "",
-  paymentDetails: "",
-  companyTypePreference: "",
-  businessActivity: [],
-  companyNameOptions: [],
-  officeType: "",
-  companyJurisdiction: "",
-  finalCompanyName: "",
-  investorName: "",
-  investorPercentage: "",
-  numberOfInvestors: "",
-  role: "",
 };
 
 export const BasicInfoPage: React.FC = () => {
@@ -124,81 +98,34 @@ export const BasicInfoPage: React.FC = () => {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch customer profile data
+        // Fetch customer profile data using customerId
         const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile/${
-            user.userId
-          }`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        // Fetch uploaded documents
-        const documentsResponse = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
-            user.userId
-          }`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const documents = documentsResponse.data.data || [];
 
         // Map backend fields to BasicInfoData
         const data = response.data.data;
         const mapped: BasicInfoData = {
-          customerName: [data.firstName, data.middleName, data.lastName]
-            .filter(Boolean)
-            .join(" "),
-          nationality: data.nationality || "",
-          dateOfBirth: data.dob
-            ? new Date(data.dob).toISOString().slice(0, 10)
-            : "",
+          firstName: data.firstName || "",
+          middleName: data.middleName || "",
+          lastName: data.lastName || "",
+          dob: data.dob ? new Date(data.dob).toISOString().slice(0, 10) : "",
           gender: data.gender || "",
+          nationality: data.nationality || "",
+          email: data.email || "",
           phoneNumber: data.phoneNumber || "",
-          emailAddress: data.email || "",
-          permanentAddress: data.permanentAddress || "",
-          countryOfResidence: data.countryOfResidence || "",
-          localAddress: data.currentAddress || "",
+          address: {
+            line1: data.address?.line1 || "",
+            line2: data.address?.line2 || "",
+            city: data.address?.city || "",
+            state: data.address?.state || "",
+            country: data.address?.country || "",
+            zipcode: data.address?.zipcode || "",
+          },
+          emiratesIdNumber: data.emiratesIdNumber || "",
           passportNumber: data.passportNumber || "",
-          passportExpiry: data.passportExpiry || "",
-          emiratesId: data.emiratesId || "",
-          residenceVisa: data.residenceVisa || "",
-          sourceOfFund: data.sourceOfFund || "",
-          quotedPrice: data.quotedPrice ? String(data.quotedPrice) : "",
-          paymentDetails: data.paymentDetails || "",
-          companyTypePreference: data.companyType || "",
-          businessActivity: [data.businessActivity1].filter(Boolean),
-          companyNameOptions: [],
-          officeType: data.officeType || "",
-          companyJurisdiction: data.jurisdiction || "",
-          finalCompanyName: "",
-          investorName: "",
-          numberOfInvestors: data.numberOfInvestors
-            ? String(data.numberOfInvestors)
-            : "",
-          investorPercentage: "",
-          role: data.role || "",
         };
-
-        // Map uploaded documents to form data
-        const localProofDoc = documents.find(
-          (doc: any) => doc.documentType === "local-proof"
-        );
-        const passportPhotoDoc = documents.find(
-          (doc: any) => doc.documentType === "passport-photo"
-        );
-        const bankStatementDoc = documents.find(
-          (doc: any) => doc.documentType === "bank-statement"
-        );
-
-        if (localProofDoc) {
-          mapped.localProof = await createFileFromDocument(localProofDoc);
-        }
-        if (passportPhotoDoc) {
-          mapped.passportPhoto = await createFileFromDocument(passportPhotoDoc);
-        }
-        if (bankStatementDoc) {
-          mapped.bankStatement = await createFileFromDocument(bankStatementDoc);
-        }
 
         setFormData(mapped);
         setOriginalData(mapped);
@@ -208,12 +135,14 @@ export const BasicInfoPage: React.FC = () => {
           description: "Failed to load profile info.",
           variant: "destructive",
         });
-        setFormData(emptyBasicInfo); // <-- Set empty form so user can edit
+        setFormData(emptyBasicInfo);
         setOriginalData(emptyBasicInfo);
       }
     };
     if (user && token) fetchData();
   }, [user, token, toast]);
+
+  console.log("BasicInfoPage User:", user);
 
   const handleEdit = () => {
     if (formData) setOriginalData({ ...formData });
@@ -221,8 +150,6 @@ export const BasicInfoPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!formData) return;
-    // Validation
     const errors = validateForm(formData);
     if (errors.length > 0) {
       toast({
@@ -234,111 +161,27 @@ export const BasicInfoPage: React.FC = () => {
     }
     setIsSaving(true);
     try {
-      // First, upload files if they exist
-      const uploadPromises = [];
-
-      if (formData.localProof) {
-        const localProofFormData = new FormData();
-        localProofFormData.append("file", formData.localProof);
-        localProofFormData.append("documentName", formData.localProof.name);
-        localProofFormData.append("documentType", "local-proof");
-        localProofFormData.append("linkedModel", "Customer");
-        localProofFormData.append("linkedTo", user.userId);
-
-        uploadPromises.push(
-          axios.post(
-            `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
-            localProofFormData,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          )
-        );
-      }
-
-      if (formData.passportPhoto) {
-        const passportPhotoFormData = new FormData();
-        passportPhotoFormData.append("file", formData.passportPhoto);
-        passportPhotoFormData.append(
-          "documentName",
-          formData.passportPhoto.name
-        );
-        passportPhotoFormData.append("documentType", "passport-photo");
-        passportPhotoFormData.append("linkedModel", "Customer");
-        passportPhotoFormData.append("linkedTo", user.userId);
-
-        uploadPromises.push(
-          axios.post(
-            `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
-            passportPhotoFormData,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          )
-        );
-      }
-
-      if (formData.bankStatement) {
-        const bankStatementFormData = new FormData();
-        bankStatementFormData.append("file", formData.bankStatement);
-        bankStatementFormData.append(
-          "documentName",
-          formData.bankStatement.name
-        );
-        bankStatementFormData.append("documentType", "bank-statement");
-        bankStatementFormData.append("linkedModel", "Customer");
-        bankStatementFormData.append("linkedTo", user.userId);
-
-        uploadPromises.push(
-          axios.post(
-            `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
-            bankStatementFormData,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          )
-        );
-      }
-
-      // Wait for all file uploads to complete
-      if (uploadPromises.length > 0) {
-        await Promise.all(uploadPromises);
-      }
-
-      // Then update the basic info (without files)
-      const dataWithoutFiles = { ...formData };
-      delete dataWithoutFiles.localProof;
-      delete dataWithoutFiles.passportPhoto;
-      delete dataWithoutFiles.bankStatement;
-
+      // Update the customer profile using customerId
       await axios.put(
-        `${import.meta.env.VITE_BASE_URL}/api/application/onboarding/${
-          user.userId
-        }`,
-        dataWithoutFiles,
+        `${import.meta.env.VITE_BASE_URL}/api/customer/${user.customerId}`,
+        formData,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      setIsEditing(false);
       toast({
         title: "Success",
-        description: "Basic Info Updated Successfully",
+        description: "Basic information updated successfully!",
       });
-    } catch (err: any) {
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error updating basic info:", error);
       toast({
         title: "Error",
-        description: err?.response?.data?.message || "Failed to update info.",
+        description:
+          error?.response?.data?.message ||
+          "Failed to update basic information",
         variant: "destructive",
       });
     } finally {
@@ -354,33 +197,86 @@ export const BasicInfoPage: React.FC = () => {
   const validateForm = (data: BasicInfoData): string[] => {
     const errors: string[] = [];
 
+    // Required fields validation
+    if (!data.firstName?.trim()) {
+      errors.push("First name is required");
+    }
+    if (!data.lastName?.trim()) {
+      errors.push("Last name is required");
+    }
+    if (!data.dob) {
+      errors.push("Date of birth is required");
+    }
+    if (!data.gender) {
+      errors.push("Gender is required");
+    }
+    if (!data.nationality?.trim()) {
+      errors.push("Nationality is required");
+    }
+    if (!data.email?.trim()) {
+      errors.push("Email is required");
+    }
+    if (!data.phoneNumber?.trim()) {
+      errors.push("Phone number is required");
+    }
+    if (!data.passportNumber?.trim()) {
+      errors.push("Passport number is required");
+    }
+
+    // Address validation
+    if (!data.address.line1?.trim()) {
+      errors.push("Address line 1 is required");
+    }
+    if (!data.address.city?.trim()) {
+      errors.push("City is required");
+    }
+    if (!data.address.state?.trim()) {
+      errors.push("State is required");
+    }
+    if (!data.address.country?.trim()) {
+      errors.push("Country is required");
+    }
+    if (!data.address.zipcode?.trim()) {
+      errors.push("Zipcode is required");
+    }
+
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.emailAddress)) {
+    if (data.email && !emailRegex.test(data.email)) {
       errors.push("Invalid email format");
     }
 
-    // Phone validation
-    const phoneRegex = /^\+?[\d\s-]{10,15}$/;
-    if (!phoneRegex.test(data.phoneNumber)) {
-      errors.push("Phone number must be 10-15 digits");
+    // Phone number validation (7-15 digits)
+    const phoneRegex = /^\d{7,15}$/;
+    if (data.phoneNumber && !phoneRegex.test(data.phoneNumber)) {
+      errors.push("Phone number must be 7 to 15 digits");
     }
 
-    // Passport expiry validation
-    const today = new Date();
-    const expiryDate = new Date(data.passportExpiry);
-    if (expiryDate <= today) {
-      errors.push("Passport expiry must be a future date");
+    // Passport number validation (alphanumeric)
+    const passportRegex = /^[a-zA-Z0-9]*$/;
+    if (data.passportNumber && !passportRegex.test(data.passportNumber)) {
+      errors.push("Passport number must be alphanumeric");
     }
 
-    // Company names validation
-    data.companyNameOptions.forEach((name, index) => {
-      if (name.length < 3) {
-        errors.push(
-          `Company name option ${index + 1} must be at least 3 characters`
-        );
+    // Emirates ID validation (alphanumeric, optional)
+    if (data.emiratesIdNumber) {
+      const emiratesIdRegex = /^[a-zA-Z0-9]*$/;
+      if (!emiratesIdRegex.test(data.emiratesIdNumber)) {
+        errors.push("Emirates ID must be alphanumeric");
       }
-    });
+    }
+
+    // Name validation (alphabets only)
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (data.firstName && !nameRegex.test(data.firstName)) {
+      errors.push("First name should contain alphabets only");
+    }
+    if (data.lastName && !nameRegex.test(data.lastName)) {
+      errors.push("Last name should contain alphabets only");
+    }
+    if (data.middleName && !nameRegex.test(data.middleName)) {
+      errors.push("Middle name should contain alphabets only");
+    }
 
     return errors;
   };

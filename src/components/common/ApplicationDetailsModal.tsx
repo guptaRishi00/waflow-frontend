@@ -121,7 +121,7 @@ export const ApplicationDetailsModal: React.FC<ApplicationDetailsModalProps> = (
     try {
       console.log('Making request to fetch customer details');
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/user/customer/profile`,
+        `${import.meta.env.VITE_BASE_URL}/api/user/customer/${application.customer._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log('Customer details response:', response.data);

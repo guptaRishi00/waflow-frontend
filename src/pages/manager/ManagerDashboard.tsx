@@ -81,7 +81,7 @@ export const ManagerDashboard: React.FC = () => {
   // Memoized fetch functions to prevent unnecessary re-renders
   const fetchAgents = useCallback(async () => {
     if (!token) return;
-    
+
     setLoadingAgents(true);
     try {
       const res = await axios.get(
@@ -134,7 +134,7 @@ export const ManagerDashboard: React.FC = () => {
 
   const fetchCustomers = useCallback(async () => {
     if (!token) return;
-    
+
     setLoadingCustomers(true);
     try {
       const response = await axios.get(
@@ -154,7 +154,7 @@ export const ManagerDashboard: React.FC = () => {
 
   const fetchApplications = useCallback(async () => {
     if (!token) return;
-    
+
     setLoadingApplications(true);
     try {
       const response = await axios.get(
@@ -174,16 +174,13 @@ export const ManagerDashboard: React.FC = () => {
 
   const fetchNotifications = useCallback(async () => {
     if (!token || !user?.userId) return;
-
-    setLoadingNotifications(true);
     try {
+      setLoadingNotifications(true);
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/api/notification/admin/${
           user.userId
         }`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setNotifications(response.data.data || []);
     } catch (error) {
@@ -194,21 +191,18 @@ export const ManagerDashboard: React.FC = () => {
     }
   }, [token, user?.userId]);
 
-  // Single useEffect to fetch all data on mount
   useEffect(() => {
-    if (token) {
-      const loadAllData = async () => {
-        await Promise.all([
-          fetchAgents(),
-          fetchCustomers(),
-          fetchApplications(),
-          fetchNotifications()
-        ]);
-      };
-      
-      loadAllData();
-    }
-  }, [token, fetchAgents, fetchCustomers, fetchApplications, fetchNotifications]);
+    fetchAgents();
+    fetchCustomers();
+    fetchApplications();
+    fetchNotifications();
+  }, [
+    token,
+    fetchAgents,
+    fetchCustomers,
+    fetchApplications,
+    fetchNotifications,
+  ]);
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -218,9 +212,7 @@ export const ManagerDashboard: React.FC = () => {
           import.meta.env.VITE_BASE_URL
         }/api/notification/read/${notificationId}`,
         {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       // Update the notification status locally
       setNotifications((prev) =>
@@ -244,7 +236,7 @@ export const ManagerDashboard: React.FC = () => {
         fetchAgents(),
         fetchCustomers(),
         fetchApplications(),
-        fetchNotifications()
+        fetchNotifications(),
       ]);
       toast({
         title: "Refreshed",
@@ -626,18 +618,24 @@ export const ManagerDashboard: React.FC = () => {
                                 variant="outline"
                                 className={`text-xs ${
                                   customerApplication.status === "New" ||
-                                  customerApplication.status === "Ready for Processing"
+                                  customerApplication.status ===
+                                    "Ready for Processing"
                                     ? "bg-blue-100 text-blue-800 border-blue-200"
-                                    : customerApplication.status === "In Progress" ||
-                                      customerApplication.status === "Waiting for Agent Review"
+                                    : customerApplication.status ===
+                                        "In Progress" ||
+                                      customerApplication.status ===
+                                        "Waiting for Agent Review"
                                     ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                    : customerApplication.status === "Completed" ||
+                                    : customerApplication.status ===
+                                        "Completed" ||
                                       customerApplication.status === "Approved"
                                     ? "bg-green-100 text-green-800 border-green-200"
-                                    : customerApplication.status === "Rejected" ||
+                                    : customerApplication.status ===
+                                        "Rejected" ||
                                       customerApplication.status === "Declined"
                                     ? "bg-red-100 text-red-800 border-red-200"
-                                    : customerApplication.status === "Awaiting Client Response"
+                                    : customerApplication.status ===
+                                      "Awaiting Client Response"
                                     ? "bg-orange-100 text-orange-800 border-orange-200"
                                     : "bg-gray-100 text-gray-800 border-gray-200"
                                 }`}
@@ -645,7 +643,9 @@ export const ManagerDashboard: React.FC = () => {
                                 {customerApplication.status}
                               </Badge>
                             ) : (
-                              <span className="text-muted-foreground text-xs">No application</span>
+                              <span className="text-muted-foreground text-xs">
+                                No application
+                              </span>
                             )}
                           </span>
                         </div>

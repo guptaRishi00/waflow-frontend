@@ -45,26 +45,28 @@ import { RootState } from "@/app/store";
 
 interface Customer {
   _id: string;
+  customerId: string;
+  assignedAgentId?: string;
+  assignedAgentRole?: string;
   firstName: string;
   middleName?: string;
   lastName: string;
   dob?: string;
   email: string;
   phoneNumber?: string;
-  currentAddress?: string;
-  permanentAddress?: string;
   nationality?: string;
   gender?: string;
-  designation?: string;
-  companyType?: string;
-  jurisdiction?: string;
-  businessActivity1?: string;
-  officeType?: string;
-  quotedPrice?: number;
-  paymentPlans?: string[] | string;
-  paymentDetails?: string;
+  address?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    country: string;
+    zipcode: string;
+  };
+  emiratesIdNumber?: string;
+  passportNumber?: string;
   createdAt: string;
-  assignedAgentId?: string;
   userId: string;
 }
 
@@ -96,6 +98,7 @@ export const CustomersPage: React.FC = () => {
     null
   );
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
+  const [agentNames, setAgentNames] = useState<{ [key: string]: string }>({});
 
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
@@ -139,18 +142,16 @@ export const CustomersPage: React.FC = () => {
     dob: "",
     email: "",
     phoneNumber: "",
-    currentAddress: "",
-    permanentAddress: "",
+    addressLine1: "",
+    addressLine2: "",
+    addressCity: "",
+    addressState: "",
+    addressCountry: "",
+    addressZipcode: "",
     nationality: "",
     gender: "",
-    designation: "",
-    companyType: "",
-    jurisdiction: "",
-    businessActivity1: "",
-    officeType: "",
-    quotedPrice: "",
-    paymentPlans: "",
-    paymentDetails: "",
+    emiratesId: "",
+    passportNumber: "",
     password: "",
   });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
@@ -190,30 +191,80 @@ export const CustomersPage: React.FC = () => {
   // Validate required fields
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
-    [
+
+    // Required fields according to backend controller
+    const requiredFields = [
       "firstName",
       "lastName",
       "dob",
+      "gender",
       "email",
       "phoneNumber",
-      "currentAddress",
-      "permanentAddress",
       "nationality",
-      "gender",
-      "designation",
-      "companyType",
-      "jurisdiction",
-      "businessActivity1",
-      "officeType",
-      "quotedPrice",
-      "paymentPlans",
-      "paymentDetails",
+      "passportNumber",
       "password",
-    ].forEach((field) => {
-      if (!form[field as keyof typeof form]) {
+    ];
+
+    requiredFields.forEach((field) => {
+      const value = form[field as keyof typeof form];
+      if (!value || (typeof value === "string" && value.trim() === "")) {
         errors[field] = "Required";
       }
     });
+
+    // Validate address fields (address is required in backend)
+    if (!form.addressLine1 || form.addressLine1.trim() === "") {
+      errors.addressLine1 = "Required";
+    }
+    if (!form.addressCity || form.addressCity.trim() === "") {
+      errors.addressCity = "Required";
+    }
+    if (!form.addressState || form.addressState.trim() === "") {
+      errors.addressState = "Required";
+    }
+    if (!form.addressCountry || form.addressCountry.trim() === "") {
+      errors.addressCountry = "Required";
+    }
+    if (!form.addressZipcode || form.addressZipcode.trim() === "") {
+      errors.addressZipcode = "Required";
+    }
+
+    // Validate email format
+    if (
+      form.email &&
+      !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(form.email)
+    ) {
+      errors.email = "Invalid email address";
+    }
+
+    // Validate phone number format (7-15 digits)
+    if (form.phoneNumber && !/^\d{7,15}$/.test(form.phoneNumber)) {
+      errors.phoneNumber = "Phone number must be 7 to 15 digits";
+    }
+
+    // Validate passport number format (alphanumeric, max 20 chars)
+    if (form.passportNumber && !/^[a-zA-Z0-9]*$/.test(form.passportNumber)) {
+      errors.passportNumber = "Passport number must be alphanumeric";
+    }
+
+    // Validate first name and last name (alphabets only)
+    if (form.firstName && !/^[A-Za-z\s]+$/.test(form.firstName)) {
+      errors.firstName = "First name should contain alphabets only";
+    }
+
+    if (form.lastName && !/^[A-Za-z\s]+$/.test(form.lastName)) {
+      errors.lastName = "Last name should contain alphabets only";
+    }
+
+    // Validate middle name (alphabets only, optional)
+    if (form.middleName && !/^[A-Za-z\s]*$/.test(form.middleName)) {
+      errors.middleName = "Middle name should contain alphabets only";
+    }
+
+    // Validate emirates ID (alphanumeric, optional)
+    if (form.emiratesId && !/^[a-zA-Z0-9]*$/.test(form.emiratesId)) {
+      errors.emiratesId = "Emirates ID must be alphanumeric";
+    }
 
     // Check password strength
     if (form.password && !passwordStrength.isStrong) {
@@ -235,10 +286,53 @@ export const CustomersPage: React.FC = () => {
     }
     setCreating(true);
     try {
-      const payload = {
-        ...form,
+      // Ensure all required fields are present
+      if (
+        !form.passportNumber ||
+        !form.addressLine1 ||
+        !form.addressCity ||
+        !form.addressState ||
+        !form.addressCountry ||
+        !form.addressZipcode
+      ) {
+        toast({
+          title: "Validation Error",
+          description: "Passport number and all address fields are required.",
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const payload: any = {
+        firstName: form.firstName,
+        middleName: form.middleName || "",
+        lastName: form.lastName,
+        dob: form.dob,
+        email: form.email,
+        phoneNumber: form.phoneNumber,
+        address: {
+          line1: form.addressLine1,
+          line2: form.addressLine2 || "",
+          city: form.addressCity,
+          state: form.addressState,
+          country: form.addressCountry,
+          zipcode: form.addressZipcode,
+        },
+        nationality: form.nationality,
+        gender: form.gender,
+        passportNumber: form.passportNumber,
+        password: form.password,
         assignedAgentId: user?.userId,
       };
+
+      // Only include emiratesIdNumber if provided
+      if (form.emiratesId && form.emiratesId.trim()) {
+        payload.emiratesIdNumber = form.emiratesId;
+      }
+
+      console.log("Sending payload:", payload); // Debug log
+
       await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/user/create-customer`,
         payload,
@@ -258,18 +352,16 @@ export const CustomersPage: React.FC = () => {
         dob: "",
         email: "",
         phoneNumber: "",
-        currentAddress: "",
-        permanentAddress: "",
+        addressLine1: "",
+        addressLine2: "",
+        addressCity: "",
+        addressState: "",
+        addressCountry: "",
+        addressZipcode: "",
         nationality: "",
         gender: "",
-        designation: "",
-        companyType: "",
-        jurisdiction: "",
-        businessActivity1: "",
-        officeType: "",
-        quotedPrice: "",
-        paymentPlans: "",
-        paymentDetails: "",
+        emiratesId: "",
+        passportNumber: "",
         password: "",
       });
       // Refresh applications list after customer creation
@@ -318,6 +410,28 @@ export const CustomersPage: React.FC = () => {
             (customer: Customer) => customer.assignedAgentId === agentId
           );
           setCustomers(agentCustomers);
+
+          // Fetch agent names for all customers
+          const agentNamePromises = agentCustomers.map(
+            async (customer: Customer) => {
+              if (customer.assignedAgentId) {
+                const agentName = await fetchAgentDetails(
+                  customer.assignedAgentId
+                );
+                return { agentId: customer.assignedAgentId, agentName };
+              }
+              return null;
+            }
+          );
+
+          const agentNameResults = await Promise.all(agentNamePromises);
+          const agentNamesMap: { [key: string]: string } = {};
+          agentNameResults.forEach((result) => {
+            if (result) {
+              agentNamesMap[result.agentId] = result.agentName;
+            }
+          });
+          setAgentNames(agentNamesMap);
 
           if (agentCustomers.length > 0) {
             setSelectedCustomer(agentCustomers[0]);
@@ -384,6 +498,27 @@ export const CustomersPage: React.FC = () => {
       console.error("Error fetching customer documents:", error);
       setCustomerDocuments([]);
     }
+  };
+
+  // Fetch agent details to get agent names
+  const fetchAgentDetails = async (agentId: string) => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agents/${agentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data.data?.fullName || "Unknown Agent";
+    } catch (error) {
+      console.error("Error fetching agent details:", error);
+      return "Unknown Agent";
+    }
+  };
+
+  // Get agent name for display
+  const getAgentName = (agentId: string) => {
+    return agentNames[agentId] || "Loading...";
   };
 
   const filteredCustomers = customers.filter(
@@ -537,36 +672,6 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="currentAddress">
-                  Current Address <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  name="currentAddress"
-                  value={form.currentAddress}
-                  onChange={handleFormChange}
-                />
-                {formErrors.currentAddress && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.currentAddress}
-                  </span>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="permanentAddress">
-                  Permanent Address <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  name="permanentAddress"
-                  value={form.permanentAddress}
-                  onChange={handleFormChange}
-                />
-                {formErrors.permanentAddress && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.permanentAddress}
-                  </span>
-                )}
-              </div>
-              <div>
                 <Label htmlFor="nationality">
                   Nationality <span className="text-red-500">*</span>
                 </Label>
@@ -574,6 +679,7 @@ export const CustomersPage: React.FC = () => {
                   name="nationality"
                   value={form.nationality}
                   onChange={handleFormChange}
+                  placeholder="Enter nationality"
                 />
                 {formErrors.nationality && (
                   <span className="text-xs text-red-500">
@@ -596,9 +702,6 @@ export const CustomersPage: React.FC = () => {
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
-                    <SelectItem value="prefer-not-to-say">
-                      Prefer not to say
-                    </SelectItem>
                   </SelectContent>
                 </Select>
                 {formErrors.gender && (
@@ -608,136 +711,130 @@ export const CustomersPage: React.FC = () => {
                 )}
               </div>
               <div>
-                <Label htmlFor="designation">
-                  Designation <span className="text-red-500">*</span>
+                <Label htmlFor="addressLine1">
+                  Address Line 1 <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  name="designation"
-                  value={form.designation}
+                  name="addressLine1"
+                  value={form.addressLine1}
                   onChange={handleFormChange}
+                  placeholder="Enter address line 1"
                 />
-                {formErrors.designation && (
+                {formErrors.addressLine1 && (
                   <span className="text-xs text-red-500">
-                    {formErrors.designation}
+                    {formErrors.addressLine1}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="companyType">
-                  Company Type <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="addressLine2">Address Line 2</Label>
                 <Input
-                  name="companyType"
-                  value={form.companyType}
+                  name="addressLine2"
+                  value={form.addressLine2}
                   onChange={handleFormChange}
+                  placeholder="Enter address line 2 (optional)"
                 />
-                {formErrors.companyType && (
+                {formErrors.addressLine2 && (
                   <span className="text-xs text-red-500">
-                    {formErrors.companyType}
+                    {formErrors.addressLine2}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="jurisdiction">
-                  Jurisdiction <span className="text-red-500">*</span>
+                <Label htmlFor="addressCity">
+                  City <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={form.jurisdiction}
-                  onValueChange={(value) =>
-                    handleSelectChange("jurisdiction", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select jurisdiction" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mainland">Mainland</SelectItem>
-                    <SelectItem value="freezone">Freezone</SelectItem>
-                    <SelectItem value="offshore">Offshore</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.jurisdiction && (
+                <Input
+                  name="addressCity"
+                  value={form.addressCity}
+                  onChange={handleFormChange}
+                  placeholder="Enter city"
+                />
+                {formErrors.addressCity && (
                   <span className="text-xs text-red-500">
-                    {formErrors.jurisdiction}
+                    {formErrors.addressCity}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="businessActivity1">
-                  Business Activity <span className="text-red-500">*</span>
+                <Label htmlFor="addressState">
+                  State <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  name="businessActivity1"
-                  value={form.businessActivity1}
+                  name="addressState"
+                  value={form.addressState}
                   onChange={handleFormChange}
+                  placeholder="Enter state"
                 />
-                {formErrors.businessActivity1 && (
+                {formErrors.addressState && (
                   <span className="text-xs text-red-500">
-                    {formErrors.businessActivity1}
+                    {formErrors.addressState}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="officeType">
-                  Office Type <span className="text-red-500">*</span>
+                <Label htmlFor="addressCountry">
+                  Country <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  name="officeType"
-                  value={form.officeType}
+                  name="addressCountry"
+                  value={form.addressCountry}
                   onChange={handleFormChange}
+                  placeholder="Enter country"
                 />
-                {formErrors.officeType && (
+                {formErrors.addressCountry && (
                   <span className="text-xs text-red-500">
-                    {formErrors.officeType}
+                    {formErrors.addressCountry}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="quotedPrice">
-                  Quoted Price <span className="text-red-500">*</span>
+                <Label htmlFor="addressZipcode">
+                  Zipcode <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  name="quotedPrice"
-                  value={form.quotedPrice}
+                  name="addressZipcode"
+                  value={form.addressZipcode}
                   onChange={handleFormChange}
+                  placeholder="Enter zipcode"
                 />
-                {formErrors.quotedPrice && (
+                {formErrors.addressZipcode && (
                   <span className="text-xs text-red-500">
-                    {formErrors.quotedPrice}
+                    {formErrors.addressZipcode}
                   </span>
                 )}
               </div>
               <div>
-                <Label htmlFor="paymentPlans">
-                  Payment Plans <span className="text-red-500">*</span>
+                <Label htmlFor="emiratesId">Emirates ID</Label>
+                <Input
+                  name="emiratesId"
+                  value={form.emiratesId}
+                  onChange={handleFormChange}
+                  placeholder="Enter Emirates ID (optional)"
+                />
+                {formErrors.emiratesId && (
+                  <span className="text-xs text-red-500">
+                    {formErrors.emiratesId}
+                  </span>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="passportNumber">
+                  Passport Number <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  name="paymentPlans"
-                  value={form.paymentPlans}
+                  name="passportNumber"
+                  value={form.passportNumber}
                   onChange={handleFormChange}
+                  placeholder="Enter passport number"
                 />
-                {formErrors.paymentPlans && (
+                {formErrors.passportNumber && (
                   <span className="text-xs text-red-500">
-                    {formErrors.paymentPlans}
+                    {formErrors.passportNumber}
                   </span>
                 )}
               </div>
-              <div className="col-span-2">
-                <Label htmlFor="paymentDetails">
-                  Payment Details <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  name="paymentDetails"
-                  value={form.paymentDetails}
-                  onChange={handleFormChange}
-                />
-                {formErrors.paymentDetails && (
-                  <span className="text-xs text-red-500">
-                    {formErrors.paymentDetails}
-                  </span>
-                )}
-              </div>
-              <div className="col-span-2">
+              <div>
                 <Label htmlFor="password">
                   Password <span className="text-red-500">*</span>
                 </Label>
@@ -747,7 +844,7 @@ export const CustomersPage: React.FC = () => {
                     type={showPassword ? "text" : "password"}
                     value={form.password}
                     onChange={handleFormChange}
-                    className="pr-10"
+                    placeholder="Enter password"
                   />
                   <Button
                     type="button"
@@ -763,89 +860,54 @@ export const CustomersPage: React.FC = () => {
                     )}
                   </Button>
                 </div>
-                {/* Password Strength Indicator */}
-                {form.password && (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      Password strength requirements:
-                    </div>
-                    <div className="space-y-1">
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasCapital
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasCapital
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Capital letter (A-Z)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasNumber
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasNumber
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Number (0-9)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasSpecial
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasSpecial
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Special character (!@#$%^&*)
-                      </div>
-                      <div
-                        className={`text-xs flex items-center gap-2 ${
-                          passwordStrength.hasMinLength
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            passwordStrength.hasMinLength
-                              ? "bg-green-600"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        Minimum 8 characters
-                      </div>
-                    </div>
-                    {passwordStrength.isStrong && (
-                      <div className="text-xs text-green-600 font-medium">
-                        ✓ Password is strong!
-                      </div>
-                    )}
-                  </div>
-                )}
                 {formErrors.password && (
                   <span className="text-xs text-red-500">
                     {formErrors.password}
                   </span>
+                )}
+                {form.password && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          passwordStrength.hasMinLength
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      />
+                      <span className="text-xs">At least 8 characters</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          passwordStrength.hasCapital
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      />
+                      <span className="text-xs">One capital letter</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          passwordStrength.hasNumber
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      />
+                      <span className="text-xs">One number</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          passwordStrength.hasSpecial
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      />
+                      <span className="text-xs">One special character</span>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -965,92 +1027,114 @@ export const CustomersPage: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <strong>First Name:</strong>{" "}
-                      {selectedCustomer.firstName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Middle Name:</strong>{" "}
-                      {selectedCustomer.middleName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Last Name:</strong>{" "}
-                      {selectedCustomer.lastName || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Date of Birth:</strong>{" "}
-                      {selectedCustomer.dob
-                        ? new Date(selectedCustomer.dob).toLocaleDateString()
-                        : "N/A"}
-                    </div>
-                    <div>
-                      <strong>Email:</strong> {selectedCustomer.email || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Phone Number:</strong>{" "}
-                      {selectedCustomer.phoneNumber || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Current Address:</strong>{" "}
-                      {selectedCustomer.currentAddress || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Permanent Address:</strong>{" "}
-                      {selectedCustomer.permanentAddress || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Nationality:</strong>{" "}
-                      {selectedCustomer.nationality || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Gender:</strong>{" "}
-                      {selectedCustomer.gender || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Designation:</strong>{" "}
-                      {selectedCustomer.designation || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Company Type:</strong>{" "}
-                      {selectedCustomer.companyType || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Jurisdiction:</strong>{" "}
-                      {selectedCustomer.jurisdiction || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Business Activity:</strong>{" "}
-                      {selectedCustomer.businessActivity1 || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Office Type:</strong>{" "}
-                      {selectedCustomer.officeType || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Quoted Price:</strong>{" "}
-                      {selectedCustomer.quotedPrice || "N/A"}
-                    </div>
-                    <div>
-                      <strong>Payment Plans:</strong>{" "}
-                      {selectedCustomer.paymentPlans
-                        ? Array.isArray(selectedCustomer.paymentPlans)
-                          ? selectedCustomer.paymentPlans.join(", ")
-                          : selectedCustomer.paymentPlans
-                        : "N/A"}
-                    </div>
-                    <div className="md:col-span-2">
-                      <strong>Payment Details:</strong>{" "}
-                      {selectedCustomer.paymentDetails || "N/A"}
-                    </div>
-
-                    <div>
-                      <strong>Created At:</strong>{" "}
-                      {selectedCustomer.createdAt
-                        ? new Date(
-                            selectedCustomer.createdAt
-                          ).toLocaleDateString()
-                        : "N/A"}
-                    </div>
+                    {selectedCustomer.customerId && (
+                      <div>
+                        <strong>Customer ID:</strong>{" "}
+                        {selectedCustomer.customerId}
+                      </div>
+                    )}
+                    {selectedCustomer.assignedAgentId && (
+                      <div>
+                        <strong>Assigned Agent:</strong>{" "}
+                        {getAgentName(selectedCustomer.assignedAgentId)}
+                      </div>
+                    )}
+                    {selectedCustomer.assignedAgentRole && (
+                      <div>
+                        <strong>Assigned Agent Role:</strong>{" "}
+                        {selectedCustomer.assignedAgentRole}
+                      </div>
+                    )}
+                    {selectedCustomer.firstName && (
+                      <div>
+                        <strong>First Name:</strong>{" "}
+                        {selectedCustomer.firstName}
+                      </div>
+                    )}
+                    {selectedCustomer.middleName && (
+                      <div>
+                        <strong>Middle Name:</strong>{" "}
+                        {selectedCustomer.middleName}
+                      </div>
+                    )}
+                    {selectedCustomer.lastName && (
+                      <div>
+                        <strong>Last Name:</strong>{" "}
+                        {selectedCustomer.lastName}
+                      </div>
+                    )}
+                    {selectedCustomer.dob && (
+                      <div>
+                        <strong>Date of Birth:</strong>{" "}
+                        {new Date(selectedCustomer.dob).toLocaleDateString()}
+                      </div>
+                    )}
+                    {selectedCustomer.email && (
+                      <div>
+                        <strong>Email:</strong> {selectedCustomer.email}
+                      </div>
+                    )}
+                    {selectedCustomer.phoneNumber && (
+                      <div>
+                        <strong>Phone Number:</strong>{" "}
+                        {selectedCustomer.phoneNumber}
+                      </div>
+                    )}
+                    {selectedCustomer.nationality && (
+                      <div>
+                        <strong>Nationality:</strong>{" "}
+                        {selectedCustomer.nationality}
+                      </div>
+                    )}
+                    {selectedCustomer.gender && (
+                      <div>
+                        <strong>Gender:</strong>{" "}
+                        {selectedCustomer.gender}
+                      </div>
+                    )}
+                    {selectedCustomer.emiratesIdNumber && (
+                      <div>
+                        <strong>Emirates ID Number:</strong>{" "}
+                        {selectedCustomer.emiratesIdNumber}
+                      </div>
+                    )}
+                    {selectedCustomer.passportNumber && (
+                      <div>
+                        <strong>Passport Number:</strong>{" "}
+                        {selectedCustomer.passportNumber}
+                      </div>
+                    )}
+                    {selectedCustomer.address && (
+                      <div className="md:col-span-2">
+                        <strong>Address:</strong>{" "}
+                        <div className="mt-1 text-sm">
+                          {selectedCustomer.address.line1 && (
+                            <div>Line 1: {selectedCustomer.address.line1}</div>
+                          )}
+                          {selectedCustomer.address.line2 && (
+                            <div>Line 2: {selectedCustomer.address.line2}</div>
+                          )}
+                          {selectedCustomer.address.city && (
+                            <div>City: {selectedCustomer.address.city}</div>
+                          )}
+                          {selectedCustomer.address.state && (
+                            <div>State: {selectedCustomer.address.state}</div>
+                          )}
+                          {selectedCustomer.address.country && (
+                            <div>Country: {selectedCustomer.address.country}</div>
+                          )}
+                          {selectedCustomer.address.zipcode && (
+                            <div>Zipcode: {selectedCustomer.address.zipcode}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {selectedCustomer.createdAt && (
+                      <div>
+                        <strong>Created At:</strong>{" "}
+                        {new Date(selectedCustomer.createdAt).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

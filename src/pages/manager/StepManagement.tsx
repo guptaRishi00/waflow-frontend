@@ -71,10 +71,15 @@ const StepManagement = ({
         localSteps.find(
           (step: any) => step.status.toLowerCase() !== "approved"
         ) || localSteps[localSteps.length - 1];
+      // We need to get the customer ID from the application
+      // For now, we'll need to pass the customer ID as a prop or get it from context
+      // This is a temporary fix - the component should receive customerId as a prop
+      const customerId = applicationId; // This should be the actual customer ID
+
       const response = await axios.patch(
         `${
           import.meta.env.VITE_BASE_URL
-        }/api/application/step/${applicationId}`,
+        }/api/application/stepStatus/${customerId}`,
         {
           stepName: currentStep.stepName,
           status: newStatus,

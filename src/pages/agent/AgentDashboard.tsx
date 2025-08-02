@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
+  Plus,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -37,6 +38,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import VisaApplicationsList from "./VisaApplicationsList";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const AgentDashboard: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -77,152 +85,6 @@ export const AgentDashboard: React.FC = () => {
     fetchApplications();
   }, [token, toast]);
 
-  // Fetch all submitted visa applications
-  useEffect(() => {
-    const fetchVisaApps = async () => {
-      if (!token) return;
-      setVisaLoading(true);
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/application/visa`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setVisaApplications(res.data.data || []);
-      } catch (err) {
-        setVisaApplications([]);
-      } finally {
-        setVisaLoading(false);
-      }
-    };
-    fetchVisaApps();
-  }, [token]);
-
-  // Modal state and form fields for creating a customer
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    firstName: "",
-    middleName: "",
-    lastName: "",
-    dob: "",
-    email: "",
-    phoneNumber: "",
-    currentAddress: "",
-    permanentAddress: "",
-    nationality: "",
-    gender: "",
-    designation: "",
-    companyType: "",
-    jurisdiction: "",
-    businessActivity1: "",
-    officeType: "",
-    quotedPrice: "",
-    paymentPlans: "",
-    paymentDetails: "",
-    password: "",
-  });
-  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-
-  // Handle form field changes
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Validate required fields
-  const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    [
-      "firstName",
-      "lastName",
-      "dob",
-      "email",
-      "phoneNumber",
-      "currentAddress",
-      "permanentAddress",
-      "nationality",
-      "gender",
-      "designation",
-      "companyType",
-      "jurisdiction",
-      "businessActivity1",
-      "officeType",
-      "quotedPrice",
-      "paymentPlans",
-      "paymentDetails",
-      "password",
-    ].forEach((field) => {
-      if (!form[field as keyof typeof form]) {
-        errors[field] = "Required";
-      }
-    });
-    return errors;
-  };
-
-  // Handle form submit
-  const handleCreateCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormErrors({});
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
-    setCreating(true);
-    try {
-      const payload = {
-        ...form,
-        assignedAgentId: user?.userId,
-      };
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/user/create-customer`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      toast({
-        title: "Success",
-        description: "Customer created successfully!",
-      });
-      setShowCreateModal(false);
-      setForm({
-        firstName: "",
-        middleName: "",
-        lastName: "",
-        dob: "",
-        email: "",
-        phoneNumber: "",
-        currentAddress: "",
-        permanentAddress: "",
-        nationality: "",
-        gender: "",
-        designation: "",
-        companyType: "",
-        jurisdiction: "",
-        businessActivity1: "",
-        officeType: "",
-        quotedPrice: "",
-        paymentPlans: "",
-        paymentDetails: "",
-        password: "",
-      });
-      // Refresh applications list after customer creation
-      fetchApplications();
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description:
-          err?.response?.data?.message || "Failed to create customer.",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
   // Update application status (Approve/Reject)
   const handleAppStatusUpdate = async (
     appId: string,
@@ -231,8 +93,21 @@ export const AgentDashboard: React.FC = () => {
   ) => {
     setActionLoading(appId + status);
     try {
+      // Find the customer ID from the applications list
+      const application = applications.find((app) => app._id === appId);
+      if (!application?.customer?._id) {
+        toast({
+          title: "Error",
+          description: "Customer ID not found for this application.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/step/${appId}`,
+        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
+          application.customer._id
+        }`,
         { stepName, status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -253,27 +128,13 @@ export const AgentDashboard: React.FC = () => {
   };
 
   const handleVisaStatusUpdate = async (id: string, status: string) => {
-    try {
-      await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/visa/${id}/approve`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast({
-        title: `Visa ${status}`,
-        description: `Visa application marked as ${status}.`,
-      });
-      setVisaApplications((prev) =>
-        prev.map((v) => (v._id === id ? { ...v, status } : v))
-      );
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description:
-          err?.response?.data?.message || "Failed to update visa status.",
-        variant: "destructive",
-      });
-    }
+    // Visa applications are now handled through regular application steps
+    // This function is deprecated as visa endpoints have been removed
+    toast({
+      title: "Info",
+      description:
+        "Visa applications are now handled through regular application steps.",
+    });
   };
 
   // Calculate stats from real data
@@ -320,18 +181,14 @@ export const AgentDashboard: React.FC = () => {
 
   return (
     <div className="space-y-10 w-full px-4 bg-gray-50 min-h-screen pb-10">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-extrabold text-primary mb-1">
-            Agent Dashboard
-          </h1>
+          <h1 className="text-4xl font-bold text-primary">Agent Dashboard</h1>
           <p className="text-lg text-muted-foreground">
             Manage your client applications and track progress
           </p>
         </div>
       </div>
-
-      {/* Create Customer Modal */}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
