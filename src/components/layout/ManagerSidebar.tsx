@@ -78,32 +78,19 @@ export const ManagerSidebar: React.FC = () => {
                   location.pathname.startsWith(item.url + "/");
                 const isActive = isExactMatch || isNestedMatch;
 
-                // Debug logging
-                console.log(`Sidebar Item: ${item.title}`);
-                console.log(`  Item URL: ${item.url}`);
-                console.log(`  Current Path: ${location.pathname}`);
-                console.log(`  Exact Match: ${isExactMatch}`);
-                console.log(`  Nested Match: ${isNestedMatch}`);
-                console.log(`  Is Active: ${isActive}`);
-
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild tooltip={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      tooltip={item.title}
+                      isActive={isActive}
+                    >
                       <NavLink
                         to={item.url}
-                        className={({ isActive: navIsActive }) => {
-                          const active = isActive || navIsActive;
-                          console.log(
-                            `  NavLink Active: ${navIsActive}, Final Active: ${active}`
-                          );
-                          return cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200",
-                            isCollapsed && "justify-center px-2",
-                            active
-                              ? "bg-blue-600 text-white font-semibold shadow-sm mx-1"
-                              : "text-white hover:bg-white/20 hover:text-white mx-1"
-                          );
-                        }}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200",
+                          isCollapsed && "justify-center px-2"
+                        )}
                       >
                         <item.icon
                           className={`h-5 w-5 flex-shrink-0 ${

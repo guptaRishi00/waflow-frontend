@@ -37,7 +37,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { PageLoader } from "@/components/ui/page-loader";
 import axios from "axios";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 
@@ -78,87 +78,137 @@ export const ManagerDashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch agents from backend on mount
-  useEffect(() => {
-    const fetchAgents = async () => {
-      setLoadingAgents(true);
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
+  // Memoized fetch functions to prevent unnecessary re-renders
+  const fetchAgents = useCallback(async () => {
+    if (!token) return;
+    
+    setLoadingAgents(true);
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      );
+      const agents = res.data.data || [];
+
+      // Get customer count for each agent using the new API endpoint
+      const agentsWithCustomerCount = await Promise.all(
+        agents.map(async (agent) => {
+          try {
+            const customerCountRes = await axios.get(
+              `${import.meta.env.VITE_BASE_URL}/api/dashboard/agent/${
+                agent._id
+              }/customers`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            return {
+              ...agent,
+              customers: customerCountRes.data.customerCount || 0,
+            };
+          } catch (err) {
+            console.error(
+              `Error fetching customer count for agent ${agent._id}:`,
+              err
+            );
+            return {
+              ...agent,
+              customers: 0,
+            };
           }
-        );
-        const agents = res.data.data || [];
+        })
+      );
 
-        // Get customer count for each agent using the new API endpoint
-        const agentsWithCustomerCount = await Promise.all(
-          agents.map(async (agent) => {
-            try {
-              const customerCountRes = await axios.get(
-                `${import.meta.env.VITE_BASE_URL}/api/dashboard/agent/${
-                  agent._id
-                }/customers`,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              return {
-                ...agent,
-                customers: customerCountRes.data.customerCount || 0,
-              };
-            } catch (err) {
-              console.error(
-                `Error fetching customer count for agent ${agent._id}:`,
-                err
-              );
-              return {
-                ...agent,
-                customers: 0,
-              };
-            }
-          })
-        );
-
-        setRecentAgents(agentsWithCustomerCount);
-      } catch (err) {
-        console.error("Error fetching agents:", err);
-        setRecentAgents([]);
-      } finally {
-        setLoadingAgents(false);
-      }
-    };
-    if (token) fetchAgents();
+      setRecentAgents(agentsWithCustomerCount);
+    } catch (err) {
+      console.error("Error fetching agents:", err);
+      setRecentAgents([]);
+    } finally {
+      setLoadingAgents(false);
+    }
   }, [token]);
 
-  // Fetch notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!token || !user?.userId) return;
+  const fetchCustomers = useCallback(async () => {
+    if (!token) return;
+    
+    setLoadingCustomers(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAllCustomers(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      setAllCustomers([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  }, [token]);
 
-      setLoadingNotifications(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/notification/admin/${
-            user.userId
-          }`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setNotifications(response.data.data || []);
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
-        setNotifications([]);
-      } finally {
-        setLoadingNotifications(false);
-      }
-    };
+  const fetchApplications = useCallback(async () => {
+    if (!token) return;
+    
+    setLoadingApplications(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAllApplications(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+      setAllApplications([]);
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, [token]);
 
-    fetchNotifications();
+  const fetchNotifications = useCallback(async () => {
+    if (!token || !user?.userId) return;
+
+    setLoadingNotifications(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/notification/admin/${
+          user.userId
+        }`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setNotifications(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      setNotifications([]);
+    } finally {
+      setLoadingNotifications(false);
+    }
   }, [token, user?.userId]);
+
+  // Single useEffect to fetch all data on mount
+  useEffect(() => {
+    if (token) {
+      const loadAllData = async () => {
+        await Promise.all([
+          fetchAgents(),
+          fetchCustomers(),
+          fetchApplications(),
+          fetchNotifications()
+        ]);
+      };
+      
+      loadAllData();
+    }
+  }, [token, fetchAgents, fetchCustomers, fetchApplications, fetchNotifications]);
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -187,67 +237,15 @@ export const ManagerDashboard: React.FC = () => {
 
   console.log("Recent Agents:", recentAgents.length);
 
-  // Fetch customers
-  useEffect(() => {
-    const fetchCustomer = async () => {
-      setLoadingCustomers(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customers`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setAllCustomers(response.data.data || []);
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        setAllCustomers([]);
-      } finally {
-        setLoadingCustomers(false);
-      }
-    };
-    if (token) fetchCustomer();
-  }, [token]);
-
-  const fetchApplications = async () => {
-    setLoadingApplications(true);
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/application`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setAllApplications(response.data.data || []);
-    } catch (error) {
-      console.error("Error fetching applications:", error);
-      setAllApplications([]);
-    } finally {
-      setLoadingApplications(false);
-    }
-  };
-
-  useEffect(() => {
-    if (token) {
-      fetchApplications();
-    }
-  }, [token]);
-
-  // Refresh applications every 30 seconds to get latest status updates
-  useEffect(() => {
-    if (token) {
-      const interval = setInterval(() => {
-        fetchApplications();
-      }, 30000); // 30 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [token]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetchApplications();
+      await Promise.all([
+        fetchAgents(),
+        fetchCustomers(),
+        fetchApplications(),
+        fetchNotifications()
+      ]);
       toast({
         title: "Refreshed",
         description: "Dashboard data has been updated.",
