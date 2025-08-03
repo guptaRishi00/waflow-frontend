@@ -1,15 +1,19 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 
 const ApplicationCard = ({
   app,
   selectedApp,
   setSelectedApp,
   applications,
+  onViewDetails,
 }: {
   app: any;
   selectedApp: any;
   setSelectedApp: (app: any) => void;
   applications: any[];
+  onViewDetails?: (applicationId: string) => void;
 }) => {
   console.log("ApplicationCard props:", { app, selectedApp, applications });
   return (
@@ -72,6 +76,21 @@ const ApplicationCard = ({
           /{app.steps?.length || 0}
         </span>
       </div>
+      {onViewDetails && (
+        <div className="mt-3 pt-2 border-t">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails(app._id);
+            }}
+          >
+            <FileText className="h-3 w-3 mr-1" />
+            View Details
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

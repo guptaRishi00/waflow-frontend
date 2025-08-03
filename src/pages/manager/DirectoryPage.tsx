@@ -361,7 +361,7 @@ export const DirectoryPage: React.FC = () => {
                                 </Badge>
                               ) : (
                                 <Badge variant="secondary" className="text-xs">
-                                  Unassigned
+                                  Admin
                                 </Badge>
                               )}
                             </div>

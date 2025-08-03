@@ -244,7 +244,7 @@ const ManagerVisaApplicationsPage: React.FC = () => {
                         </p>
                         <p className="text-xs text-blue-600 truncate">
                           Agent:{" "}
-                          {app.customer.assignedAgent?.fullName || "Unassigned"}
+                          {app.customer.assignedAgent?.fullName || "Admin"}
                         </p>
                       </div>
                     </div>
@@ -270,7 +270,7 @@ const ManagerVisaApplicationsPage: React.FC = () => {
                   <span className="text-sm text-blue-600">
                     Agent:{" "}
                     {selectedApplication.customer.assignedAgent?.fullName ||
-                      "Unassigned"}
+                      "Admin"}
                   </span>
                 </CardDescription>
               </CardHeader>

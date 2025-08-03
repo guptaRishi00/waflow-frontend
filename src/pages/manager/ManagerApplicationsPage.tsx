@@ -21,6 +21,7 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import CustomerDocuments from "./CustomerDocuments";
+import ApplicationDetailView from "./ApplicationDetailView";
 
 export const ManagerApplicationsPage: React.FC = () => {
   const [applications, setApplications] = useState<any[]>([]);
@@ -36,6 +37,9 @@ export const ManagerApplicationsPage: React.FC = () => {
   const [customerDocuments, setCustomerDocuments] = useState<any[]>([]);
   const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    string | null
+  >(null);
   // Remove visaApplications, visaLoading, fetchVisaApps, and handleVisaStatusUpdate state and logic
 
   const [demo, setDemo] = useState(null);
@@ -77,7 +81,9 @@ export const ManagerApplicationsPage: React.FC = () => {
       if (!selectedApp?.customer?._id || !token) return;
       try {
         const customerResponse = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customer/${selectedApp.customer._id}`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer/${
+            selectedApp.customer._id
+          }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setCustomerProfile(customerResponse.data.data);
@@ -160,6 +166,14 @@ export const ManagerApplicationsPage: React.FC = () => {
     setIsApplicationModalOpen(true);
   };
 
+  const handleViewApplicationDetails = (applicationId: string) => {
+    setSelectedApplicationId(applicationId);
+  };
+
+  const handleBackToApplications = () => {
+    setSelectedApplicationId(null);
+  };
+
   // Approve/Reject handler for ProgressTracker
   const handleStepAction = async (
     stepIndex: number,
@@ -237,6 +251,16 @@ export const ManagerApplicationsPage: React.FC = () => {
     return <PageLoader message="Loading applications..." size="lg" />;
   }
 
+  // Show application detail view if an application is selected
+  if (selectedApplicationId) {
+    return (
+      <ApplicationDetailView
+        applicationId={selectedApplicationId}
+        onBack={handleBackToApplications}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 w-full px-4">
       <div>
@@ -257,6 +281,7 @@ export const ManagerApplicationsPage: React.FC = () => {
               selectedApp={selectedApp}
               setSelectedApp={setSelectedApp}
               applications={applications}
+              onViewDetails={handleViewApplicationDetails}
             />
           </div>
         ))}

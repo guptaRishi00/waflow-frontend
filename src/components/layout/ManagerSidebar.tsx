@@ -63,7 +63,7 @@ export const ManagerSidebar: React.FC = () => {
               }
               alt="Waflow Logo"
               className={`${
-                isCollapsed ? "w-12 h-12" : "w-56 h-14"
+                isCollapsed ? "w-12 h-12" : "w-48 h-12"
               } object-contain transition-all duration-300`}
             />
           </div>

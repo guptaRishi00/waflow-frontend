@@ -67,6 +67,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PageLoader } from "@/components/ui/page-loader";
 import axios from "axios";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CustomerDetailView } from "./CustomerDetailView";
 
 // Customer interface
 interface Customer {
@@ -75,6 +76,8 @@ interface Customer {
   firstName: string;
   middleName?: string;
   lastName: string;
+  dob?: string;
+  gender?: string;
   email: string;
   phoneNumber?: string;
   nationality?: string;
@@ -122,6 +125,7 @@ export const ManagerCustomersPage: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const { token } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
 
@@ -136,15 +140,34 @@ export const ManagerCustomersPage: React.FC = () => {
   const [customerToToggle, setCustomerToToggle] = useState<Customer | null>(
     null
   );
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null
+  );
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
+    customerId: "",
+    assignedAgentId: "",
+    assignedAgentRole: "",
     firstName: "",
+    middleName: "",
     lastName: "",
+    dob: "",
+    gender: "",
     email: "",
     phoneNumber: "",
     nationality: "",
+    emiratesIdNumber: "",
+    passportNumber: "",
     password: "",
+    address: {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      country: "",
+      zipcode: "",
+    },
   });
   const [editFormErrors, setEditFormErrors] = useState<{
     [key: string]: string;
@@ -196,6 +219,13 @@ export const ManagerCustomersPage: React.FC = () => {
 
   const passwordStrength = checkPasswordStrength(createFormData.password);
 
+  // Debug useEffect for edit form data
+  useEffect(() => {
+    if (isEditModalOpen && editFormData.firstName) {
+      console.log("Edit form data updated:", editFormData);
+    }
+  }, [editFormData, isEditModalOpen]);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -211,8 +241,11 @@ export const ManagerCustomersPage: React.FC = () => {
         }
       );
       return response.data.data;
-    } catch (err) {
-      console.error("Error fetching agent details:", err);
+    } catch (err: any) {
+      // Only log non-404 errors to reduce console noise
+      if (err.response?.status !== 404) {
+        console.error("Error fetching agent details:", err);
+      }
       return null;
     }
   };
@@ -230,6 +263,7 @@ export const ManagerCustomersPage: React.FC = () => {
       );
 
       const customersData = response.data.data || [];
+      console.log("Raw customers data from API:", customersData);
 
       // Fetch agent details for each customer with assignedAgentId
       const customersWithAgents = await Promise.all(
@@ -247,6 +281,7 @@ export const ManagerCustomersPage: React.FC = () => {
         })
       );
 
+      console.log("Processed customers data:", customersWithAgents);
       setCustomers(customersWithAgents);
     } catch (err) {
       console.error("Error fetching customers:", err);
@@ -350,11 +385,20 @@ export const ManagerCustomersPage: React.FC = () => {
     setIsUpdating(true);
     try {
       const updateData: any = {
+        customerId: editFormData.customerId,
+        assignedAgentId: editFormData.assignedAgentId,
+        assignedAgentRole: editFormData.assignedAgentRole,
         firstName: editFormData.firstName,
+        middleName: editFormData.middleName,
         lastName: editFormData.lastName,
+        dob: editFormData.dob,
+        gender: editFormData.gender,
         email: editFormData.email,
         phoneNumber: editFormData.phoneNumber,
         nationality: editFormData.nationality,
+        emiratesIdNumber: editFormData.emiratesIdNumber,
+        passportNumber: editFormData.passportNumber,
+        address: editFormData.address,
       };
 
       // Only include password if it's provided
@@ -388,12 +432,28 @@ export const ManagerCustomersPage: React.FC = () => {
 
       setIsEditModalOpen(false);
       setEditFormData({
+        customerId: "",
+        assignedAgentId: "",
+        assignedAgentRole: "",
         firstName: "",
+        middleName: "",
         lastName: "",
+        dob: "",
+        gender: "",
         email: "",
         phoneNumber: "",
         nationality: "",
+        emiratesIdNumber: "",
+        passportNumber: "",
         password: "",
+        address: {
+          line1: "",
+          line2: "",
+          city: "",
+          state: "",
+          country: "",
+          zipcode: "",
+        },
       });
       setEditFormErrors({});
       setShowEditPassword(false);
@@ -704,12 +764,28 @@ export const ManagerCustomersPage: React.FC = () => {
   useEffect(() => {
     if (selectedCustomer && isEditModalOpen) {
       setEditFormData({
+        customerId: selectedCustomer.customerId || "",
+        assignedAgentId: selectedCustomer.assignedAgentId || "",
+        assignedAgentRole: selectedCustomer.assignedAgentRole || "",
         firstName: selectedCustomer.firstName || "",
+        middleName: selectedCustomer.middleName || "",
         lastName: selectedCustomer.lastName || "",
+        dob: selectedCustomer.dob || "",
+        gender: selectedCustomer.gender || "",
         email: selectedCustomer.email || "",
         phoneNumber: selectedCustomer.phoneNumber || "",
         nationality: selectedCustomer.nationality || "",
+        emiratesIdNumber: selectedCustomer.emiratesIdNumber || "",
+        passportNumber: selectedCustomer.passportNumber || "",
         password: "",
+        address: {
+          line1: selectedCustomer.address?.line1 || "",
+          line2: selectedCustomer.address?.line2 || "",
+          city: selectedCustomer.address?.city || "",
+          state: selectedCustomer.address?.state || "",
+          country: selectedCustomer.address?.country || "",
+          zipcode: selectedCustomer.address?.zipcode || "",
+        },
       });
       setEditFormErrors({});
       setShowEditPassword(false);
@@ -741,6 +817,14 @@ export const ManagerCustomersPage: React.FC = () => {
     setCurrentPage(1);
   };
 
+  const handleViewCustomerDetails = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+  };
+
+  const handleBackToCustomers = () => {
+    setSelectedCustomerId(null);
+  };
+
   // Reset to first page when search term changes
   useEffect(() => {
     setCurrentPage(1);
@@ -748,6 +832,16 @@ export const ManagerCustomersPage: React.FC = () => {
 
   if (loading) {
     return <PageLoader message="Loading customers..." size="lg" />;
+  }
+
+  // Show customer detail view if a customer is selected
+  if (selectedCustomerId) {
+    return (
+      <CustomerDetailView
+        customerId={selectedCustomerId}
+        onBack={handleBackToCustomers}
+      />
+    );
   }
 
   return (
@@ -1129,7 +1223,7 @@ export const ManagerCustomersPage: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
@@ -1195,45 +1289,6 @@ export const ManagerCustomersPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Search and Pagination */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search customers..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              {itemsPerPage} items per page
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleItemsPerPageChange("5")}>
-              5 items
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleItemsPerPageChange("10")}>
-              10 items
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleItemsPerPageChange("20")}>
-              20 items
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleItemsPerPageChange("50")}>
-              50 items
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {/* Customer Directory */}
       <Card>
         <CardHeader>
@@ -1241,6 +1296,55 @@ export const ManagerCustomersPage: React.FC = () => {
           <CardDescription>Search and manage all customers</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    {itemsPerPage} items per page
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => handleItemsPerPageChange("5")}
+                  >
+                    5 items
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleItemsPerPageChange("10")}
+                  >
+                    10 items
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleItemsPerPageChange("20")}
+                  >
+                    20 items
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleItemsPerPageChange("50")}
+                  >
+                    50 items
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
           {error && (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
@@ -1268,193 +1372,300 @@ export const ManagerCustomersPage: React.FC = () => {
           )}
 
           {!error && filteredCustomers.length > 0 && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Nationality</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Applications</TableHead>
-                  <TableHead>Assigned Agent</TableHead>
-                  <TableHead>Last Activity</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedCustomers.map((customer) => (
-                  <TableRow key={customer._id}>
-                    <TableCell className="font-medium">
-                      {customer.customerId}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getCustomerInitials(customer)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">
-                            {getCustomerName(customer)}
+            <>
+              <div className="overflow-x-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">ID</TableHead>
+                      <TableHead className="w-[180px]">Name</TableHead>
+                      <TableHead className="w-[140px]">Contact</TableHead>
+                      <TableHead className="w-[100px]">Nationality</TableHead>
+                      <TableHead className="w-[80px]">Status</TableHead>
+                      <TableHead className="w-[80px]">Apps</TableHead>
+                      <TableHead className="w-[120px]">Agent</TableHead>
+                      <TableHead className="w-[120px]">Last Activity</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedCustomers.map((customer) => (
+                      <TableRow key={customer._id}>
+                        <TableCell className="font-medium">
+                          <span className="text-sm">{customer.customerId}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                                {getCustomerInitials(customer)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm">
+                                {getCustomerName(customer)}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {customer.email}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {customer.phoneNumber || "N/A"}
+                            </span>
                           </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="text-sm flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {customer.phoneNumber || "N/A"}
-                        </p>
-                        <p className="text-sm flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {customer.email}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{customer.nationality || "N/A"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          getCustomerStatus(customer) === "active"
-                            ? "default"
-                            : "secondary"
-                        }
-                        className={
-                          getCustomerStatus(customer) === "active"
-                            ? "bg-green-100 text-green-800 border-green-200"
-                            : "bg-yellow-100 text-yellow-800 border-yellow-200"
-                        }
-                      >
-                        {getCustomerStatus(customer)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {getCustomerApplicationsCount(customer._id)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {customer.assignedAgent ? (
-                        <div>
-                          <div className="font-medium">
-                            {customer.assignedAgent.fullName}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          Unassigned
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(customer.createdAt)}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              setIsViewModalOpen(true);
-                            }}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {customer.nationality || "N/A"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              getCustomerStatus(customer) === "active"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className={
+                              getCustomerStatus(customer) === "active"
+                                ? "bg-green-100 text-green-800 border-green-200"
+                                : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            }
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              setIsEditModalOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleToggleStatus(customer)}
-                          >
-                            {getCustomerStatus(customer) === "active" ? (
-                              <>
-                                <UserX className="h-4 w-4 mr-2" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="h-4 w-4 mr-2" />
-                                Activate
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                            {getCustomerStatus(customer)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-sm font-medium">
+                            {getCustomerApplicationsCount(customer._id)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {customer.assignedAgent
+                              ? customer.assignedAgent.fullName
+                              : "Admin"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {formatDate(customer.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedCustomer(customer);
+                                  setIsViewModalOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleViewCustomerDetails(customer._id)
+                                }
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  console.log(
+                                    "Customer data for edit:",
+                                    customer
+                                  );
+                                  console.log(
+                                    "Customer address:",
+                                    customer.address
+                                  );
+                                  console.log("Customer dob:", customer.dob);
+                                  console.log(
+                                    "Customer gender:",
+                                    customer.gender
+                                  );
+
+                                  setSelectedCustomer(customer);
+                                  setEditFormData({
+                                    customerId: customer.customerId || "",
+                                    assignedAgentId:
+                                      customer.assignedAgentId || "",
+                                    assignedAgentRole:
+                                      customer.assignedAgentRole || "",
+                                    firstName: customer.firstName || "",
+                                    middleName: customer.middleName || "",
+                                    lastName: customer.lastName || "",
+                                    dob: customer.dob
+                                      ? new Date(customer.dob)
+                                          .toISOString()
+                                          .split("T")[0]
+                                      : "",
+                                    gender: customer.gender || "",
+                                    email: customer.email || "",
+                                    phoneNumber: customer.phoneNumber || "",
+                                    nationality: customer.nationality || "",
+                                    emiratesIdNumber:
+                                      customer.emiratesIdNumber || "",
+                                    passportNumber:
+                                      customer.passportNumber || "",
+                                    password: "",
+                                    address: {
+                                      line1: customer.address?.line1 || "",
+                                      line2: customer.address?.line2 || "",
+                                      city: customer.address?.city || "",
+                                      state: customer.address?.state || "",
+                                      country: customer.address?.country || "",
+                                      zipcode: customer.address?.zipcode || "",
+                                    },
+                                  });
+                                  console.log("Edit form data set:", {
+                                    customerId: customer.customerId || "",
+                                    assignedAgentId:
+                                      customer.assignedAgentId || "",
+                                    assignedAgentRole:
+                                      customer.assignedAgentRole || "",
+                                    firstName: customer.firstName || "",
+                                    middleName: customer.middleName || "",
+                                    lastName: customer.lastName || "",
+                                    dob: customer.dob
+                                      ? new Date(customer.dob)
+                                          .toISOString()
+                                          .split("T")[0]
+                                      : "",
+                                    gender: customer.gender || "",
+                                    email: customer.email || "",
+                                    phoneNumber: customer.phoneNumber || "",
+                                    nationality: customer.nationality || "",
+                                    emiratesIdNumber:
+                                      customer.emiratesIdNumber || "",
+                                    passportNumber:
+                                      customer.passportNumber || "",
+                                    address: {
+                                      line1: customer.address?.line1 || "",
+                                      line2: customer.address?.line2 || "",
+                                      city: customer.address?.city || "",
+                                      state: customer.address?.state || "",
+                                      country: customer.address?.country || "",
+                                      zipcode: customer.address?.zipcode || "",
+                                    },
+                                  });
+                                  setIsEditModalOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleToggleStatus(customer)}
+                              >
+                                {getCustomerStatus(customer) === "active" ? (
+                                  <>
+                                    <UserX className="h-4 w-4 mr-2" />
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Activate
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 gap-4 mt-4">
+                  <div className="text-sm text-muted-foreground text-center sm:text-left">
+                    Showing {startIndex + 1} to{" "}
+                    {Math.min(endIndex, filteredCustomers.length)} of{" "}
+                    {filteredCustomers.length} results
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-4">
-          <div className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to{" "}
-            {Math.min(endIndex, filteredCustomers.length)} of{" "}
-            {filteredCustomers.length} results
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Edit Customer Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Customer Details</DialogTitle>
             <DialogDescription>
-              Update customer information. Email cannot be changed.
+              Update customer information. All fields are editable.
             </DialogDescription>
           </DialogHeader>
           {selectedCustomer && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-customerId">Customer ID</Label>
+                  <Input
+                    id="edit-customerId"
+                    value={editFormData.customerId || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        customerId: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., CX-0001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-middleName">Middle Name</Label>
+                  <Input
+                    id="edit-middleName"
+                    value={editFormData.middleName || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        middleName: e.target.value,
+                      })
+                    }
+                    placeholder="Middle Name (Optional)"
+                  />
+                </div>
                 <div>
                   <Label htmlFor="edit-firstName">First Name *</Label>
                   <Input
@@ -1495,101 +1706,322 @@ export const ManagerCustomersPage: React.FC = () => {
                     </p>
                   )}
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="edit-email">Email Address</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editFormData.email}
-                  disabled
-                  className="bg-gray-100 cursor-not-allowed"
-                  placeholder="Email address (read-only)"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Email address cannot be changed
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="edit-phone">Phone Number *</Label>
-                <Input
-                  id="edit-phone"
-                  value={editFormData.phoneNumber}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      phoneNumber: e.target.value,
-                    })
-                  }
-                  placeholder="+971-XX-XXX-XXXX"
-                  className={editFormErrors.phoneNumber ? "border-red-500" : ""}
-                />
-                {editFormErrors.phoneNumber && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {editFormErrors.phoneNumber}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-nationality">Nationality *</Label>
-                <Input
-                  id="edit-nationality"
-                  value={editFormData.nationality}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      nationality: e.target.value,
-                    })
-                  }
-                  placeholder="Enter nationality"
-                  className={editFormErrors.nationality ? "border-red-500" : ""}
-                />
-                {editFormErrors.nationality && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {editFormErrors.nationality}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-password">New Password (Optional)</Label>
-                <div className="relative">
+                <div>
+                  <Label htmlFor="edit-dob">Date of Birth</Label>
                   <Input
-                    id="edit-password"
-                    type={showEditPassword ? "text" : "password"}
-                    value={editFormData.password}
+                    id="edit-dob"
+                    type="date"
+                    value={editFormData.dob || ""}
                     onChange={(e) =>
                       setEditFormData({
                         ...editFormData,
-                        password: e.target.value,
+                        dob: e.target.value,
                       })
                     }
-                    placeholder="Leave blank to keep current password"
-                    className={`pr-10 ${
-                      editFormErrors.password ? "border-red-500" : ""
-                    }`}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowEditPassword(!showEditPassword)}
-                  >
-                    {showEditPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
-                {editFormErrors.password && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {editFormErrors.password}
+                <div>
+                  <Label htmlFor="edit-gender">Gender</Label>
+                  <select
+                    id="edit-gender"
+                    value={editFormData.gender || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        gender: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-email">Email Address</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        email: e.target.value,
+                      })
+                    }
+                    placeholder="Email Address"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-phone">Phone Number *</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editFormData.phoneNumber}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        phoneNumber: e.target.value,
+                      })
+                    }
+                    placeholder="+971-XX-XXX-XXXX"
+                    className={
+                      editFormErrors.phoneNumber ? "border-red-500" : ""
+                    }
+                  />
+                  {editFormErrors.phoneNumber && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {editFormErrors.phoneNumber}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="edit-nationality">Nationality *</Label>
+                  <Input
+                    id="edit-nationality"
+                    value={editFormData.nationality}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        nationality: e.target.value,
+                      })
+                    }
+                    placeholder="Enter nationality"
+                    className={
+                      editFormErrors.nationality ? "border-red-500" : ""
+                    }
+                  />
+                  {editFormErrors.nationality && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {editFormErrors.nationality}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="edit-emiratesId">Emirates ID</Label>
+                  <Input
+                    id="edit-emiratesId"
+                    value={editFormData.emiratesIdNumber || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        emiratesIdNumber: e.target.value,
+                      })
+                    }
+                    placeholder="Emirates ID Number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-passport">Passport Number</Label>
+                  <Input
+                    id="edit-passport"
+                    value={editFormData.passportNumber || ""}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        passportNumber: e.target.value,
+                      })
+                    }
+                    placeholder="Passport Number"
+                  />
+                </div>
+              </div>
+
+              {/* Agent Assignment */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-semibold">Agent Assignment</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-assignedAgentId">
+                      Assigned Agent ID
+                    </Label>
+                    <Input
+                      id="edit-assignedAgentId"
+                      value={editFormData.assignedAgentId || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          assignedAgentId: e.target.value,
+                        })
+                      }
+                      placeholder="Agent ID"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-assignedAgentRole">Agent Role</Label>
+                    <Input
+                      id="edit-assignedAgentRole"
+                      value={editFormData.assignedAgentRole || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          assignedAgentRole: e.target.value,
+                        })
+                      }
+                      placeholder="Agent Role"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Information */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-semibold">Address Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="edit-addressLine1">Address Line 1</Label>
+                    <Input
+                      id="edit-addressLine1"
+                      value={editFormData.address?.line1 || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            line1: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Address Line 1"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="edit-addressLine2">Address Line 2</Label>
+                    <Input
+                      id="edit-addressLine2"
+                      value={editFormData.address?.line2 || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            line2: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Address Line 2 (Optional)"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-city">City</Label>
+                    <Input
+                      id="edit-city"
+                      value={editFormData.address?.city || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            city: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-state">State</Label>
+                    <Input
+                      id="edit-state"
+                      value={editFormData.address?.state || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            state: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-country">Country</Label>
+                    <Input
+                      id="edit-country"
+                      value={editFormData.address?.country || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            country: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Country"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-zipcode">Zip Code</Label>
+                    <Input
+                      id="edit-zipcode"
+                      value={editFormData.address?.zipcode || ""}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          address: {
+                            ...editFormData.address,
+                            zipcode: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Zip Code"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-semibold">Password (Optional)</h4>
+                <div>
+                  <Label htmlFor="edit-password">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="edit-password"
+                      type={showEditPassword ? "text" : "password"}
+                      value={editFormData.password}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          password: e.target.value,
+                        })
+                      }
+                      placeholder="Leave blank to keep current password"
+                      className={`pr-10 ${
+                        editFormErrors.password ? "border-red-500" : ""
+                      }`}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                    >
+                      {showEditPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {editFormErrors.password && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {editFormErrors.password}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave blank to keep the current password
                   </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Leave blank to keep the current password
-                </p>
+                </div>
               </div>
             </div>
           )}
@@ -1766,7 +2198,7 @@ export const ManagerCustomersPage: React.FC = () => {
                     <p className="font-medium">
                       {selectedCustomer.assignedAgent
                         ? selectedCustomer.assignedAgent.fullName
-                        : "Unassigned"}
+                        : "Admin"}
                     </p>
                   </div>
                 </div>
