@@ -1015,9 +1015,7 @@ export const ManagerCustomersPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-primary">All Customers</h1>
-          <p className="text-muted-foreground">
-            Overview of all customers across all agents
-          </p>
+          <p className="text-muted-foreground">View and manage All customers</p>
         </div>
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
@@ -1029,15 +1027,16 @@ export const ManagerCustomersPage: React.FC = () => {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Create New Customer</DialogTitle>
-              <p className="">
-                All Fields are mandatory <span className="text-red-500">*</span>
+              <p className="text-sm text-muted-foreground">
+                Fields marked with <span className="text-red-500">*</span> are
+                mandatory
               </p>
             </DialogHeader>
             <form
               onSubmit={handleCreateCustomer}
               className="space-y-3 max-h-[70vh] overflow-y-auto"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="firstName">
                     First Name <span className="text-red-500">*</span>
@@ -1076,6 +1075,8 @@ export const ManagerCustomersPage: React.FC = () => {
                     </span>
                   )}
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="dob">
                     Date of Birth <span className="text-red-500">*</span>
@@ -2309,24 +2310,16 @@ export const ManagerCustomersPage: React.FC = () => {
                           {getCustomerInitials(customerDetails)}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <CardTitle className="text-xl">
+                      <div className="flex-1">
+                        <CardTitle className="text-2xl font-bold">
                           {customerDetails.firstName}{" "}
                           {customerDetails.middleName}{" "}
                           {customerDetails.lastName}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-base">
                           Customer ID: {customerDetails.customerId}
                         </CardDescription>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Status */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Status
-                      </span>
                       <Badge
                         variant={
                           getCustomerStatus(customerDetails) === "active"
@@ -2342,53 +2335,54 @@ export const ManagerCustomersPage: React.FC = () => {
                         {getCustomerStatus(customerDetails)}
                       </Badge>
                     </div>
-
+                  </CardHeader>
+                  <CardContent className="space-y-6">
                     {/* Contact Information */}
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="flex items-center gap-3">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <Mail className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.email}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Email Address
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <Phone className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.phoneNumber || "Not provided"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Phone Number
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <User className="h-4 w-4 text-muted-foreground" />
+                        <User className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.nationality || "Not specified"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Nationality
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <Shield className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.assignedAgent?.fullName ||
                               "Not assigned"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Assigned Agent
                           </p>
                           {customerDetails.assignedAgent?.email && (
@@ -2401,26 +2395,26 @@ export const ManagerCustomersPage: React.FC = () => {
                     </div>
 
                     {/* Identity Documents */}
-                    <div className="space-y-3 pt-2 border-t">
+                    <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.emiratesIdNumber || "Not provided"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Emirates ID
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerDetails.passportNumber || "Not provided"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Passport Number
                           </p>
                         </div>
@@ -2429,27 +2423,27 @@ export const ManagerCustomersPage: React.FC = () => {
 
                     {/* Address */}
                     {customerDetails.address && (
-                      <div className="space-y-3 pt-2 border-t">
+                      <div className="space-y-4 pt-4 border-t">
                         <div className="flex items-start gap-3">
-                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="space-y-1">
-                            <p className="text-sm font-medium">
+                            <p className="text-base font-medium">
                               {customerDetails.address.line1}
                             </p>
                             {customerDetails.address.line2 && (
-                              <p className="text-sm">
+                              <p className="text-base">
                                 {customerDetails.address.line2}
                               </p>
                             )}
-                            <p className="text-sm">
+                            <p className="text-base">
                               {customerDetails.address.city},{" "}
                               {customerDetails.address.state}{" "}
                               {customerDetails.address.zipcode}
                             </p>
-                            <p className="text-sm">
+                            <p className="text-base">
                               {customerDetails.address.country}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm text-muted-foreground">
                               Address
                             </p>
                           </div>
@@ -2458,14 +2452,14 @@ export const ManagerCustomersPage: React.FC = () => {
                     )}
 
                     {/* Dates */}
-                    <div className="space-y-3 pt-2 border-t">
+                    <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {formatDate(customerDetails.createdAt)}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Created Date
                           </p>
                         </div>
@@ -2473,12 +2467,12 @@ export const ManagerCustomersPage: React.FC = () => {
 
                       {customerDetails.updatedAt && (
                         <div className="flex items-center gap-3">
-                          <Activity className="h-4 w-4 text-muted-foreground" />
+                          <Activity className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <p className="text-sm font-medium">
+                            <p className="text-base font-medium">
                               {formatDate(customerDetails.updatedAt)}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm text-muted-foreground">
                               Last Activity
                             </p>
                           </div>
@@ -2487,22 +2481,22 @@ export const ManagerCustomersPage: React.FC = () => {
                     </div>
 
                     {/* Application Count */}
-                    <div className="space-y-3 pt-2 border-t">
+                    <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {customerApplications.length} Application(s)
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Total Applications
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <Activity className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-base font-medium">
                             {
                               customerApplications.filter(
                                 (app) => app.status === "active"
@@ -2510,29 +2504,12 @@ export const ManagerCustomersPage: React.FC = () => {
                             }{" "}
                             Active
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             Active Applications
                           </p>
                         </div>
                       </div>
                     </div>
-
-                    {/* Assigned Agent */}
-                    {customerDetails.assignedAgent && (
-                      <div className="space-y-3 pt-2 border-t">
-                        <div className="flex items-center gap-3">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">
-                              {customerDetails.assignedAgent.fullName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Assigned Agent
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
