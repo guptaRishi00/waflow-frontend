@@ -7,6 +7,7 @@ import {
   Users,
   FolderOpen,
   CreditCard,
+  UserCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,7 +30,7 @@ import { cn } from "@/lib/utils";
 
 const managerNavItems = [
   { title: "Dashboard", url: "/manager/dashboard", icon: LayoutDashboard },
-  { title: "Agents", url: "/manager/agents", icon: Shield },
+  { title: "Agents", url: "/manager/agents", icon: UserCheck },
   { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Customers", url: "/manager/customers", icon: Users },
   { title: "Documents", url: "/manager/directory", icon: FolderOpen },

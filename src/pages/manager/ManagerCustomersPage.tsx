@@ -60,6 +60,16 @@ import {
   ChevronDown,
   Plus,
   EyeOff,
+  User,
+  MapPin,
+  Activity,
+  Upload,
+  Download,
+  CheckCircle2,
+  X,
+  Loader2,
+  MessageSquare,
+  Shield,
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
@@ -67,7 +77,8 @@ import { useToast } from "@/hooks/use-toast";
 import { PageLoader } from "@/components/ui/page-loader";
 import axios from "axios";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CustomerDetailView } from "./CustomerDetailView";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 // Customer interface
 interface Customer {
@@ -107,6 +118,9 @@ interface Customer {
 // Application interface
 interface Application {
   _id: string;
+  applicationNumber: string;
+  status: string;
+  paymentStatus: string;
   customer:
     | string
     | {
@@ -115,7 +129,51 @@ interface Application {
         lastName: string;
         email: string;
       };
-  status: string;
+  assignedAgent?: {
+    _id: string;
+    fullName: string;
+  };
+  submissionDate: string;
+  lastUpdatedDate: string;
+  companyJurisdiction?: string;
+  steps?: Array<{
+    stepName: string;
+    status: string;
+    description?: string;
+  }>;
+  notes?: Array<{
+    _id: string;
+    message: string;
+    addedBy: string;
+    createdAt: string;
+  }>;
+  businessSetup?: {
+    companyType?: string;
+    businessActivity?: string;
+    proposedName?: string;
+    alternativeNames?: string[];
+    officeType?: string;
+    quotedPrice?: number;
+  };
+  investors?: Array<{
+    name: string;
+    ownershipPercentage: number;
+    role: string;
+  }>;
+  payments?: Array<{
+    amount: number;
+    status: string;
+    invoiceUrl?: string;
+  }>;
+  documents?: Array<{
+    _id: string;
+    name: string;
+    uploadedBy: string;
+    uploadedDate: string;
+    downloadUrl: string;
+    fileSize?: number;
+    fileType?: string;
+  }>;
   createdAt: string;
 }
 
@@ -143,6 +201,15 @@ export const ManagerCustomersPage: React.FC = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null
   );
+  const [customerDetails, setCustomerDetails] = useState<Customer | null>(null);
+  const [customerApplications, setCustomerApplications] = useState<
+    Application[]
+  >([]);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [agents, setAgents] = useState<
+    Array<{ _id: string; fullName: string; email: string }>
+  >([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
@@ -194,6 +261,7 @@ export const ManagerCustomersPage: React.FC = () => {
     emiratesId: "",
     passportNumber: "",
     password: "",
+    assignedAgentId: "",
   });
   const [createFormErrors, setCreateFormErrors] = useState<{
     [key: string]: string;
@@ -229,6 +297,30 @@ export const ManagerCustomersPage: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // Fetch all agents
+  const fetchAgents = async () => {
+    if (!token) return;
+    setIsLoadingAgents(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/agents`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAgents(response.data.data || []);
+    } catch (err: any) {
+      console.error("Error fetching agents:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load agents",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  };
 
   // Fetch agent details by agent ID
   const fetchAgentDetails = async (agentId: string) => {
@@ -315,6 +407,7 @@ export const ManagerCustomersPage: React.FC = () => {
   useEffect(() => {
     fetchCustomers();
     fetchApplications();
+    fetchAgents();
   }, [token]);
 
   // Calculate summary statistics
@@ -551,6 +644,7 @@ export const ManagerCustomersPage: React.FC = () => {
       "nationality",
       "passportNumber",
       "password",
+      "assignedAgentId",
     ];
 
     requiredFields.forEach((field) => {
@@ -704,6 +798,7 @@ export const ManagerCustomersPage: React.FC = () => {
         gender: createFormData.gender,
         passportNumber: createFormData.passportNumber,
         password: createFormData.password,
+        assignedAgentId: createFormData.assignedAgentId,
       };
 
       // Only include emiratesIdNumber if provided
@@ -743,6 +838,7 @@ export const ManagerCustomersPage: React.FC = () => {
         emiratesId: "",
         passportNumber: "",
         password: "",
+        assignedAgentId: "",
       });
       setCreateFormErrors({});
       setShowCreatePassword(false);
@@ -817,8 +913,85 @@ export const ManagerCustomersPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleViewCustomerDetails = (customerId: string) => {
-    setSelectedCustomerId(customerId);
+  const handleViewCustomerDetails = async (customerId: string) => {
+    if (!token) return;
+
+    setIsLoadingDetails(true);
+    try {
+      console.log("Fetching customer details for ID:", customerId);
+
+      // Fetch customer details
+      const customerResponse = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/user/customer/${customerId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log("Customer response:", customerResponse.data);
+      if (!customerResponse.data.data) {
+        throw new Error("Customer not found");
+      }
+
+      let customerData = customerResponse.data.data;
+
+      // Fetch agent details if customer has assignedAgentId
+      if (customerData.assignedAgentId) {
+        const agentDetails = await fetchAgentDetails(
+          customerData.assignedAgentId
+        );
+        customerData = {
+          ...customerData,
+          assignedAgent: agentDetails,
+        };
+      }
+
+      setCustomerDetails(customerData);
+
+      // Fetch customer applications
+      try {
+        const applicationsResponse = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/application/app/${customerId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log("Applications response:", applicationsResponse.data);
+
+        // Handle the response - it could be a single application or an array
+        let applicationsData = [];
+        if (applicationsResponse.data.data) {
+          // If it's a single application object, wrap it in an array
+          if (Array.isArray(applicationsResponse.data.data)) {
+            applicationsData = applicationsResponse.data.data;
+          } else {
+            applicationsData = [applicationsResponse.data.data];
+          }
+        }
+
+        console.log("Processed applications data:", applicationsData);
+        setCustomerApplications(applicationsData);
+      } catch (applicationError) {
+        console.log(
+          "No applications found for customer:",
+          applicationError.response?.status
+        );
+        // If no applications found (404), set empty array
+        if (applicationError.response?.status === 404) {
+          setCustomerApplications([]);
+        } else {
+          console.error("Error fetching applications:", applicationError);
+        }
+      }
+
+      setIsViewModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching customer details:", error);
+      console.error("Error response:", error.response?.data);
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to load customer details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
   };
 
   const handleBackToCustomers = () => {
@@ -834,15 +1007,7 @@ export const ManagerCustomersPage: React.FC = () => {
     return <PageLoader message="Loading customers..." size="lg" />;
   }
 
-  // Show customer detail view if a customer is selected
-  if (selectedCustomerId) {
-    return (
-      <CustomerDetailView
-        customerId={selectedCustomerId}
-        onBack={handleBackToCustomers}
-      />
-    );
-  }
+  // Remove the separate page navigation logic since we'll use popup modals
 
   return (
     <div className="space-y-6">
@@ -971,6 +1136,40 @@ export const ManagerCustomersPage: React.FC = () => {
                   {createFormErrors.nationality && (
                     <span className="text-xs text-red-500">
                       {createFormErrors.nationality}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="assignedAgentId">
+                    Assign Agent <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createFormData.assignedAgentId}
+                    onValueChange={(value) =>
+                      handleCreateSelectChange("assignedAgentId", value)
+                    }
+                    disabled={isLoadingAgents}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          isLoadingAgents
+                            ? "Loading agents..."
+                            : "Select an agent"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents.map((agent) => (
+                        <SelectItem key={agent._id} value={agent._id}>
+                          {agent.fullName} ({agent.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {createFormErrors.assignedAgentId && (
+                    <span className="text-xs text-red-500">
+                      {createFormErrors.assignedAgentId}
                     </span>
                   )}
                 </div>
@@ -1465,19 +1664,11 @@ export const ManagerCustomersPage: React.FC = () => {
                               <DropdownMenuItem
                                 onClick={() => {
                                   setSelectedCustomer(customer);
-                                  setIsViewModalOpen(true);
+                                  handleViewCustomerDetails(customer._id);
                                 }}
                               >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Profile
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleViewCustomerDetails(customer._id)
-                                }
-                              >
-                                <FileText className="h-4 w-4 mr-2" />
-                                View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
@@ -1631,7 +1822,8 @@ export const ManagerCustomersPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Edit Customer Details</DialogTitle>
             <DialogDescription>
-              Update customer information. All fields are editable.
+              Update customer information. Customer ID, Email, and Agent
+              Assignment are read-only.
             </DialogDescription>
           </DialogHeader>
           {selectedCustomer && (
@@ -1643,12 +1835,8 @@ export const ManagerCustomersPage: React.FC = () => {
                   <Input
                     id="edit-customerId"
                     value={editFormData.customerId || ""}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        customerId: e.target.value,
-                      })
-                    }
+                    disabled
+                    className="bg-gray-100 cursor-not-allowed"
                     placeholder="e.g., CX-0001"
                   />
                 </div>
@@ -1749,12 +1937,8 @@ export const ManagerCustomersPage: React.FC = () => {
                     id="edit-email"
                     type="email"
                     value={editFormData.email}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        email: e.target.value,
-                      })
-                    }
+                    disabled
+                    className="bg-gray-100 cursor-not-allowed"
                     placeholder="Email Address"
                   />
                 </div>
@@ -1837,33 +2021,25 @@ export const ManagerCustomersPage: React.FC = () => {
                 <h4 className="font-semibold">Agent Assignment</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-assignedAgentId">
-                      Assigned Agent ID
-                    </Label>
+                    <Label>Assigned Agent Name</Label>
                     <Input
-                      id="edit-assignedAgentId"
-                      value={editFormData.assignedAgentId || ""}
-                      onChange={(e) =>
-                        setEditFormData({
-                          ...editFormData,
-                          assignedAgentId: e.target.value,
-                        })
+                      value={
+                        selectedCustomer?.assignedAgent?.fullName ||
+                        "Not assigned"
                       }
-                      placeholder="Agent ID"
+                      disabled
+                      className="bg-gray-100 cursor-not-allowed"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-assignedAgentRole">Agent Role</Label>
+                    <Label>Agent Email</Label>
                     <Input
-                      id="edit-assignedAgentRole"
-                      value={editFormData.assignedAgentRole || ""}
-                      onChange={(e) =>
-                        setEditFormData({
-                          ...editFormData,
-                          assignedAgentRole: e.target.value,
-                        })
+                      value={
+                        selectedCustomer?.assignedAgent?.email ||
+                        "Not available"
                       }
-                      placeholder="Agent Role"
+                      disabled
+                      className="bg-gray-100 cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -2099,293 +2275,1041 @@ export const ManagerCustomersPage: React.FC = () => {
 
       {/* View Customer Profile Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Customer Information</DialogTitle>
+            <DialogTitle>Customer Profile</DialogTitle>
             <DialogDescription>
               Complete customer profile and application details
             </DialogDescription>
           </DialogHeader>
-          {selectedCustomer && (
-            <div className="space-y-6">
-              {/* Customer Info Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-primary">
-                  Customer Info
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">Customer ID</Label>
-                    <p className="font-medium">{selectedCustomer.customerId}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Full Name</Label>
-                    <p className="font-medium">
-                      {getCustomerName(selectedCustomer)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Created Date
-                    </Label>
-                    <p className="font-medium">
-                      {formatDate(selectedCustomer.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Last Activity Date
-                    </Label>
-                    <p className="font-medium">
-                      {formatDate(
-                        selectedCustomer.updatedAt || selectedCustomer.createdAt
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <p className="font-medium">{selectedCustomer.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Phone Number
-                    </Label>
-                    <p className="font-medium">
-                      {selectedCustomer.phoneNumber || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Nationality</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.nationality || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Emirates ID</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.emiratesIdNumber || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Passport Number
-                    </Label>
-                    <p className="font-medium">
-                      {selectedCustomer.passportNumber || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <Badge
-                      variant={
-                        getCustomerStatus(selectedCustomer) === "active"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className={
-                        getCustomerStatus(selectedCustomer) === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }
-                    >
-                      {getCustomerStatus(selectedCustomer)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Assigned Agent
-                    </Label>
-                    <p className="font-medium">
-                      {selectedCustomer.assignedAgent
-                        ? selectedCustomer.assignedAgent.fullName
-                        : "Admin"}
-                    </p>
-                  </div>
-                </div>
+
+          {isLoadingDetails ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-muted-foreground">
+                  Loading customer details...
+                </p>
               </div>
+            </div>
+          ) : customerDetails ? (
+            <Tabs defaultValue="customer-info" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="customer-info">Customer Info</TabsTrigger>
+                <TabsTrigger value="applications">Applications</TabsTrigger>
+              </TabsList>
 
-              {/* Address Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-primary">Address</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Address Line 1
-                    </Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.line1 || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Address Line 2
-                    </Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.line2 || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">City</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.city || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">State</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.state || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Country</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.country || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Zipcode</Label>
-                    <p className="font-medium">
-                      {selectedCustomer.address?.zipcode || "N/A"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Applications Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-primary">
-                  Applications
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-muted-foreground">
-                        Total Applications
-                      </Label>
-                      <p className="font-medium text-lg">
-                        {getCustomerApplicationsCount(selectedCustomer._id)}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">
-                        Application Status
-                      </Label>
-                      <div className="flex gap-2 mt-1">
-                        {(() => {
-                          const customerApps = applications.filter((app) => {
-                            if (typeof app.customer === "string") {
-                              return app.customer === selectedCustomer._id;
-                            }
-                            if (
-                              typeof app.customer === "object" &&
-                              app.customer !== null
-                            ) {
-                              return (
-                                (app.customer as any)._id ===
-                                selectedCustomer._id
-                              );
-                            }
-                            return false;
-                          });
-
-                          const statusCounts = customerApps.reduce(
-                            (acc, app) => {
-                              acc[app.status] = (acc[app.status] || 0) + 1;
-                              return acc;
-                            },
-                            {} as { [key: string]: number }
-                          );
-
-                          return Object.entries(statusCounts).map(
-                            ([status, count]) => (
-                              <Badge
-                                key={status}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {status}: {count}
-                              </Badge>
-                            )
-                          );
-                        })()}
+              {/* Customer Info Tab */}
+              <TabsContent value="customer-info" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarFallback className="text-lg">
+                          {getCustomerInitials(customerDetails)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-xl">
+                          {customerDetails.firstName}{" "}
+                          {customerDetails.middleName}{" "}
+                          {customerDetails.lastName}
+                        </CardTitle>
+                        <CardDescription>
+                          Customer ID: {customerDetails.customerId}
+                        </CardDescription>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Application List */}
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">
-                      Application Details
-                    </Label>
-                    {(() => {
-                      const customerApps = applications.filter((app) => {
-                        if (typeof app.customer === "string") {
-                          return app.customer === selectedCustomer._id;
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Status */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Status
+                      </span>
+                      <Badge
+                        variant={
+                          getCustomerStatus(customerDetails) === "active"
+                            ? "default"
+                            : "secondary"
                         }
-                        if (
-                          typeof app.customer === "object" &&
-                          app.customer !== null
-                        ) {
-                          return (
-                            (app.customer as any)._id === selectedCustomer._id
-                          );
+                        className={
+                          getCustomerStatus(customerDetails) === "active"
+                            ? "bg-green-100 text-green-800 border-green-200"
+                            : "bg-yellow-100 text-yellow-800 border-yellow-200"
                         }
-                        return false;
-                      });
+                      >
+                        {getCustomerStatus(customerDetails)}
+                      </Badge>
+                    </div>
 
-                      if (customerApps.length === 0) {
-                        return (
-                          <p className="text-sm text-muted-foreground">
-                            No applications found
+                    {/* Contact Information */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.email}
                           </p>
-                        );
-                      }
+                          <p className="text-xs text-muted-foreground">
+                            Email Address
+                          </p>
+                        </div>
+                      </div>
 
-                      return customerApps.map((app, index) => (
-                        <div
-                          key={app._id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium text-sm">
-                              Application {index + 1}
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.phoneNumber || "Not provided"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Phone Number
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.nationality || "Not specified"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Nationality
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.assignedAgent?.fullName ||
+                              "Not assigned"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Assigned Agent
+                          </p>
+                          {customerDetails.assignedAgent?.email && (
+                            <p className="text-xs text-muted-foreground">
+                              {customerDetails.assignedAgent.email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Identity Documents */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.emiratesIdNumber || "Not provided"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Emirates ID
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerDetails.passportNumber || "Not provided"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Passport Number
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    {customerDetails.address && (
+                      <div className="space-y-3 pt-2 border-t">
+                        <div className="flex items-start gap-3">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                              {customerDetails.address.line1}
+                            </p>
+                            {customerDetails.address.line2 && (
+                              <p className="text-sm">
+                                {customerDetails.address.line2}
+                              </p>
+                            )}
+                            <p className="text-sm">
+                              {customerDetails.address.city},{" "}
+                              {customerDetails.address.state}{" "}
+                              {customerDetails.address.zipcode}
+                            </p>
+                            <p className="text-sm">
+                              {customerDetails.address.country}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Created: {formatDate(app.createdAt)}
+                              Address
                             </p>
                           </div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              app.status === "New" ||
-                              app.status === "Ready for Processing"
-                                ? "bg-blue-100 text-blue-800 border-blue-200"
-                                : app.status === "In Progress" ||
-                                  app.status === "Waiting for Agent Review"
-                                ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                : app.status === "Completed" ||
-                                  app.status === "Approved"
-                                ? "bg-green-100 text-green-800 border-green-200"
-                                : app.status === "Rejected" ||
-                                  app.status === "Declined"
-                                ? "bg-red-100 text-red-800 border-red-200"
-                                : app.status === "Awaiting Client Response"
-                                ? "bg-orange-100 text-orange-800 border-orange-200"
-                                : "bg-gray-100 text-gray-800 border-gray-200"
-                            }
-                          >
-                            {app.status}
-                          </Badge>
                         </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              </div>
+                      </div>
+                    )}
+
+                    {/* Dates */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formatDate(customerDetails.createdAt)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Created Date
+                          </p>
+                        </div>
+                      </div>
+
+                      {customerDetails.updatedAt && (
+                        <div className="flex items-center gap-3">
+                          <Activity className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              {formatDate(customerDetails.updatedAt)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Last Activity
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Application Count */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {customerApplications.length} Application(s)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Total Applications
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {
+                              customerApplications.filter(
+                                (app) => app.status === "active"
+                              ).length
+                            }{" "}
+                            Active
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Active Applications
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assigned Agent */}
+                    {customerDetails.assignedAgent && (
+                      <div className="space-y-3 pt-2 border-t">
+                        <div className="flex items-center gap-3">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              {customerDetails.assignedAgent.fullName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Assigned Agent
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Applications Tab */}
+              <TabsContent value="applications" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>
+                          Applications ({customerApplications.length})
+                        </CardTitle>
+                        <CardDescription>
+                          All applications for this customer
+                        </CardDescription>
+                      </div>
+                      <Badge variant="secondary">
+                        {
+                          customerApplications.filter(
+                            (app) => app.status === "active"
+                          ).length
+                        }{" "}
+                        Active
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {customerApplications.length > 0 ? (
+                      <div className="space-y-4">
+                        {customerApplications.map((application, index) => (
+                          <ApplicationAccordion
+                            key={application._id}
+                            application={application}
+                            index={index}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          No Applications
+                        </h3>
+                        <p className="text-muted-foreground">
+                          This customer hasn't submitted any applications yet.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="text-center py-8">
+              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Customer Not Found
+              </h3>
+              <p className="text-muted-foreground">
+                The customer you're looking for doesn't exist.
+              </p>
             </div>
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+// Application Accordion Component
+interface ApplicationAccordionProps {
+  application: Application;
+  index: number;
+}
+
+const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
+  application,
+  index,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    file: null as File | null,
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const [isStepActionLoading, setIsStepActionLoading] = useState(false);
+  const [agentNotes, setAgentNotes] = useState("");
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const { token, user } = useSelector((state: RootState) => state.customerAuth);
+  const { toast } = useToast();
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select a file smaller than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setUploadForm((prev) => ({ ...prev, file }));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadForm.title || !uploadForm.file || !application) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("title", uploadForm.title);
+      formData.append("file", uploadForm.file);
+      formData.append("applicationId", application._id);
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/document/upload`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      toast({
+        title: "Document uploaded",
+        description: "Document has been uploaded successfully",
+      });
+
+      setIsUploadDialogOpen(false);
+      setUploadForm({ title: "", file: null });
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownload = async (documentId: string, fileName: string) => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/download/${documentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "blob",
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download document. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Step management functions
+  const handleStepAction = async (
+    stepIndex: number,
+    action: "approve" | "reject"
+  ) => {
+    if (!application.steps || !token) return;
+
+    setIsStepActionLoading(true);
+    try {
+      const step = application.steps[stepIndex];
+      const response = await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
+          typeof application.customer === "string"
+            ? application.customer
+            : application.customer._id
+        }`,
+        {
+          stepName: step.stepName,
+          status: action === "approve" ? "Approved" : "Declined",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast({
+        title: `Step ${action === "approve" ? "Approved" : "Rejected"}`,
+        description: `Step "${step.stepName}" has been ${
+          action === "approve" ? "approved" : "rejected"
+        }.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update step status.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStepActionLoading(false);
+    }
+  };
+
+  // Add note function
+  const addNote = async () => {
+    if (!application._id || !agentNotes.trim() || !user?.userId) return;
+
+    setIsAddingNote(true);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/application/note/${
+          application._id
+        }`,
+        {
+          message: agentNotes,
+          addedBy: user.userId,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setAgentNotes("");
+      toast({
+        title: "Note Added",
+        description: "Your note has been added successfully.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to add note.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusColors = {
+      "in progress": "bg-blue-100 text-blue-800 border-blue-200",
+      approved: "bg-green-100 text-green-800 border-green-200",
+      rejected: "bg-red-100 text-red-800 border-red-200",
+      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      completed: "bg-green-100 text-green-800 border-green-200",
+    };
+
+    return (
+      <Badge
+        variant="outline"
+        className={
+          statusColors[status.toLowerCase() as keyof typeof statusColors] ||
+          "bg-gray-100 text-gray-800"
+        }
+      >
+        {status}
+      </Badge>
+    );
+  };
+
+  return (
+    <div className="border rounded-lg">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+            {index + 1}
+          </div>
+          <div>
+            <h3 className="font-semibold">Application {index + 1}</h3>
+            <p className="text-sm text-muted-foreground">
+              ID: {application.applicationNumber}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {getStatusBadge(application.status)}
+          <Badge variant="outline">{application.paymentStatus}</Badge>
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="p-4 border-t bg-gray-50">
+          <div className="space-y-6">
+            {/* 1. Application Details */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">1. Application Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Application ID:</span>
+                  <span className="font-medium">{application._id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Assigned Agent:</span>
+                  <span>{application.assignedAgent?.fullName || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Submission Date:
+                  </span>
+                  <span>{formatDate(application.submissionDate)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Updated:</span>
+                  <span>{formatDate(application.lastUpdatedDate)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Current Status:</span>
+                  <span>{getStatusBadge(application.status)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Company Jurisdiction:
+                  </span>
+                  <span>{application.companyJurisdiction || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Business Setup Details */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">
+                2. Business Setup Details
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Company Type:</span>
+                  <span>{application.businessSetup?.companyType || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Business Activity:
+                  </span>
+                  <span>
+                    {application.businessSetup?.businessActivity || "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Proposed Name:</span>
+                  <span>
+                    {application.businessSetup?.proposedName || "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Alternative Names:
+                  </span>
+                  <span>
+                    {application.businessSetup?.alternativeNames?.length > 0
+                      ? application.businessSetup.alternativeNames.join(", ")
+                      : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Office Type:</span>
+                  <span>{application.businessSetup?.officeType || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Quoted Price:</span>
+                  <span>
+                    {application.businessSetup?.quotedPrice
+                      ? `$${application.businessSetup.quotedPrice}`
+                      : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Investor Details */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">3. Investor Details</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Number of Investors:
+                  </span>
+                  <span>{application.investors?.length || 0}</span>
+                </div>
+              </div>
+              {application.investors && application.investors.length > 0 ? (
+                <div className="space-y-3">
+                  {application.investors.map((investor, idx) => (
+                    <div key={idx} className="p-3 bg-white rounded border">
+                      <h5 className="font-medium text-sm mb-2">
+                        Investor {idx + 1}:
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Name:</span>
+                          <p className="font-medium">
+                            {investor.name || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Ownership %:
+                          </span>
+                          <p className="font-medium">
+                            {investor.ownershipPercentage || "N/A"}%
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Role:</span>
+                          <p className="font-medium">
+                            {investor.role || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    No investors found
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Payment Details */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">4. Payment Details</h4>
+              {application.payments && application.payments.length > 0 ? (
+                <div className="space-y-3">
+                  {application.payments.map((payment, idx) => (
+                    <div key={idx} className="p-3 bg-white rounded border">
+                      <h5 className="font-medium text-sm mb-2">
+                        Payment {idx + 1}:
+                      </h5>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Amount:
+                            </span>
+                            <span className="font-medium">
+                              ${payment.amount || "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Status:
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={
+                                payment.status === "paid"
+                                  ? "bg-green-100 text-green-800"
+                                  : payment.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }
+                            >
+                              {payment.status || "N/A"}
+                            </Badge>
+                          </div>
+                        </div>
+                        {payment.invoiceUrl && (
+                          <Button size="sm" variant="outline">
+                            Download Invoice
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    No payment details found
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 5. Documents */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">5. Documents</h4>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-muted-foreground">
+                  Uploaded Documents:
+                </span>
+                <Dialog
+                  open={isUploadDialogOpen}
+                  onOpenChange={setIsUploadDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload New Document
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Upload Document</DialogTitle>
+                      <DialogDescription>
+                        Upload a new document for this application. Maximum file
+                        size is 10MB.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="title">Document Title</Label>
+                        <Input
+                          id="title"
+                          value={uploadForm.title}
+                          onChange={(e) =>
+                            setUploadForm((prev) => ({
+                              ...prev,
+                              title: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter document title"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="file">Select File</Label>
+                        <Input
+                          id="file"
+                          type="file"
+                          onChange={handleFileChange}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsUploadDialogOpen(false);
+                          setUploadForm({ title: "", file: null });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleUpload}
+                        disabled={
+                          !uploadForm.title || !uploadForm.file || isUploading
+                        }
+                      >
+                        {isUploading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {application.documents && application.documents.length > 0 ? (
+                <div className="space-y-3">
+                  {application.documents.map((document, idx) => (
+                    <div
+                      key={document._id || idx}
+                      className="p-3 bg-white rounded border"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Document Name:
+                          </span>
+                          <span className="font-medium">
+                            {document.name || "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Uploaded By:
+                          </span>
+                          <span>{document.uploadedBy || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Uploaded Date:
+                          </span>
+                          <span>{formatDate(document.uploadedDate)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Actions:
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleDownload(document._id, document.name)
+                              }
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No documents uploaded yet
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Application Steps */}
+            {application.steps && application.steps.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">6. Application Steps</h4>
+                <div className="space-y-3">
+                  {application.steps.map((step, stepIndex) => (
+                    <div
+                      key={stepIndex}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                          {stepIndex + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{step.stepName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {step.description || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(step.status)}
+                        {step.status.toLowerCase() === "pending" && (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleStepAction(stepIndex, "approve")
+                              }
+                              disabled={isStepActionLoading}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleStepAction(stepIndex, "reject")
+                              }
+                              disabled={isStepActionLoading}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes Section */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm">7. Notes & Comments</h4>
+
+              {/* Add Note */}
+              <div className="space-y-3">
+                <Textarea
+                  placeholder="Add a note or comment..."
+                  value={agentNotes}
+                  onChange={(e) => setAgentNotes(e.target.value)}
+                  className="min-h-[80px]"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={addNote}
+                    disabled={!agentNotes.trim() || isAddingNote}
+                  >
+                    {isAddingNote ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                        Add Note
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Display Notes */}
+              {application.notes && application.notes.length > 0 && (
+                <div className="space-y-3">
+                  <h5 className="text-sm font-medium">Previous Notes</h5>
+                  <div className="space-y-2">
+                    {application.notes.map((note, noteIndex) => (
+                      <div
+                        key={noteIndex}
+                        className="p-3 bg-gray-50 rounded-lg border"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm">{note.message}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Added by {note.addedBy || "N/A"} on{" "}
+                              {formatDate(note.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
