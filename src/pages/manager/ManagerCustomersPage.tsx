@@ -1024,7 +1024,7 @@ export const ManagerCustomersPage: React.FC = () => {
               Create New Customer
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Customer</DialogTitle>
               <p className="text-sm text-muted-foreground">
@@ -1819,7 +1819,7 @@ export const ManagerCustomersPage: React.FC = () => {
 
       {/* Edit Customer Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Customer Details</DialogTitle>
             <DialogDescription>
@@ -2302,216 +2302,258 @@ export const ManagerCustomersPage: React.FC = () => {
 
               {/* Customer Info Tab */}
               <TabsContent value="customer-info" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarFallback className="text-lg">
-                          {getCustomerInitials(customerDetails)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <CardTitle className="text-2xl font-bold">
-                          {customerDetails.firstName}{" "}
-                          {customerDetails.middleName}{" "}
-                          {customerDetails.lastName}
-                        </CardTitle>
-                        <CardDescription className="text-base">
-                          Customer ID: {customerDetails.customerId}
-                        </CardDescription>
-                      </div>
-                      <Badge
-                        variant={
-                          getCustomerStatus(customerDetails) === "active"
-                            ? "default"
-                            : "secondary"
-                        }
-                        className={
-                          getCustomerStatus(customerDetails) === "active"
-                            ? "bg-green-100 text-green-800 border-green-200"
-                            : "bg-yellow-100 text-yellow-800 border-yellow-200"
-                        }
-                      >
-                        {getCustomerStatus(customerDetails)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Contact Information */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Mail className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.email}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Email Address
-                          </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column - Basic Info */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-16 w-16">
+                          <AvatarFallback className="text-lg">
+                            {getCustomerInitials(customerDetails)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <CardTitle className="text-2xl font-bold">
+                            {customerDetails.firstName}{" "}
+                            {customerDetails.middleName}{" "}
+                            {customerDetails.lastName}
+                          </CardTitle>
+                          <CardDescription className="text-base">
+                            Customer ID: {customerDetails.customerId}
+                          </CardDescription>
                         </div>
+                        <Badge
+                          variant={
+                            getCustomerStatus(customerDetails) === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={
+                            getCustomerStatus(customerDetails) === "active"
+                              ? "bg-green-100 text-green-800 border-green-200"
+                              : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                          }
+                        >
+                          {getCustomerStatus(customerDetails)}
+                        </Badge>
                       </div>
-
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.phoneNumber || "Not provided"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Phone Number
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <User className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.nationality || "Not specified"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Nationality
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Shield className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.assignedAgent?.fullName ||
-                              "Not assigned"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Assigned Agent
-                          </p>
-                          {customerDetails.assignedAgent?.email && (
-                            <p className="text-xs text-muted-foreground">
-                              {customerDetails.assignedAgent.email}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Identity Documents */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.emiratesIdNumber || "Not provided"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Emirates ID
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerDetails.passportNumber || "Not provided"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Passport Number
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Address */}
-                    {customerDetails.address && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <div className="flex items-start gap-3">
-                          <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="space-y-1">
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Contact Information */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Mail className="h-5 w-5 text-muted-foreground" />
+                          <div>
                             <p className="text-base font-medium">
-                              {customerDetails.address.line1}
-                            </p>
-                            {customerDetails.address.line2 && (
-                              <p className="text-base">
-                                {customerDetails.address.line2}
-                              </p>
-                            )}
-                            <p className="text-base">
-                              {customerDetails.address.city},{" "}
-                              {customerDetails.address.state}{" "}
-                              {customerDetails.address.zipcode}
-                            </p>
-                            <p className="text-base">
-                              {customerDetails.address.country}
+                              {customerDetails.email}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Address
+                              Email Address
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Phone className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.phoneNumber || "Not provided"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Phone Number
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.nationality || "Not specified"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Nationality
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Shield className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.assignedAgent?.fullName ||
+                                "Not assigned"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Assigned Agent
+                            </p>
+                            {customerDetails.assignedAgent?.email && (
+                              <p className="text-xs text-muted-foreground">
+                                {customerDetails.assignedAgent.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Identity Documents */}
+                      <div className="space-y-4 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.emiratesIdNumber ||
+                                "Not provided"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Emirates ID
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.passportNumber || "Not provided"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Passport Number
                             </p>
                           </div>
                         </div>
                       </div>
-                    )}
+                    </CardContent>
+                  </Card>
 
-                    {/* Dates */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {formatDate(customerDetails.createdAt)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Created Date
-                          </p>
+                  {/* Right Column - Additional Info */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        Additional Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Address */}
+                      {customerDetails.address && (
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3">
+                            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                            <div className="space-y-1">
+                              <p className="text-base font-medium">
+                                {customerDetails.address.line1}
+                              </p>
+                              {customerDetails.address.line2 && (
+                                <p className="text-base">
+                                  {customerDetails.address.line2}
+                                </p>
+                              )}
+                              <p className="text-base">
+                                {customerDetails.address.city},{" "}
+                                {customerDetails.address.state}{" "}
+                                {customerDetails.address.zipcode}
+                              </p>
+                              <p className="text-base">
+                                {customerDetails.address.country}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Address
+                              </p>
+                            </div>
+                          </div>
                         </div>
+                      )}
+
+                      {/* Dates */}
+                      <div className="space-y-3 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {formatDate(customerDetails.createdAt)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Created Date
+                            </p>
+                          </div>
+                        </div>
+
+                        {customerDetails.updatedAt && (
+                          <div className="flex items-center gap-3">
+                            <Activity className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="text-base font-medium">
+                                {formatDate(customerDetails.updatedAt)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Last Activity
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {customerDetails.updatedAt && (
+                      {/* Application Statistics */}
+                      <div className="space-y-3 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerApplications.length} Application(s)
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Total Applications
+                            </p>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-3">
                           <Activity className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <p className="text-base font-medium">
-                              {formatDate(customerDetails.updatedAt)}
+                              {
+                                customerApplications.filter(
+                                  (app) => app.status === "active"
+                                ).length
+                              }{" "}
+                              Active
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Last Activity
+                              Active Applications
                             </p>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Application Count */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {customerApplications.length} Application(s)
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Total Applications
-                          </p>
+                      {/* Additional Customer Details */}
+                      <div className="space-y-3 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-base font-medium">
+                              {customerDetails.gender || "Not specified"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Gender
+                            </p>
+                          </div>
                         </div>
+                        {customerDetails.dob && (
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="text-base font-medium">
+                                {formatDate(customerDetails.dob)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Date of Birth
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Activity className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-base font-medium">
-                            {
-                              customerApplications.filter(
-                                (app) => app.status === "active"
-                              ).length
-                            }{" "}
-                            Active
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Active Applications
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               {/* Applications Tab */}

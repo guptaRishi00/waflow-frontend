@@ -60,6 +60,7 @@ import { RootState } from "@/app/store";
 export const AgentsPage: React.FC = () => {
   const [agents, setAgents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active"); // "all", "active", "inactive"
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -443,13 +444,43 @@ export const AgentsPage: React.FC = () => {
   }, [selectedAgent, isEditModalOpen]);
 
   console.log("Agents data:", agents);
+  console.log("Current status filter:", statusFilter);
+  console.log(
+    "Agents with their status:",
+    agents.map((agent) => ({ name: agent.fullName, status: agent.status }))
+  );
+
+  // Log first few agents to see their structure
+  if (agents.length > 0) {
+    console.log("First agent structure:", agents[0]);
+    console.log(
+      "All agent statuses:",
+      agents.map((agent) => agent.status)
+    );
+  }
 
   // Pagination logic
-  const filteredAgents = agents.filter(
-    (agent) =>
+  const filteredAgents = agents.filter((agent) => {
+    console.log(
+      `Processing agent: ${agent.fullName}, status: ${agent.status}, filter: ${statusFilter}`
+    );
+
+    // First filter by status
+    if (statusFilter !== "all" && agent.status !== statusFilter) {
+      console.log(
+        `Filtering out agent ${agent.fullName} with status: ${agent.status}, filter: ${statusFilter}`
+      );
+      return false;
+    }
+
+    // Then filter by search term
+    const matchesSearch =
       agent.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      agent.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    console.log(`Agent ${agent.fullName} passes filters: ${matchesSearch}`);
+    return matchesSearch;
+  });
 
   // Sort agents by creation date (newest first)
   const sortedAgents = filteredAgents.sort((a, b) => {
@@ -472,10 +503,10 @@ export const AgentsPage: React.FC = () => {
     setCurrentPage(1); // Reset to first page when changing items per page
   };
 
-  // Reset to first page when search term changes
+  // Reset to first page when search term or status filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -694,7 +725,7 @@ export const AgentsPage: React.FC = () => {
         </Dialog>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -705,6 +736,29 @@ export const AgentsPage: React.FC = () => {
             className="pl-10"
           />
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              {statusFilter === "all"
+                ? "All Status"
+                : statusFilter === "active"
+                ? "Active Only"
+                : "Inactive Only"}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+              All Agents
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter("active")}>
+              Active Only
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusFilter("inactive")}>
+              Inactive Only
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">
