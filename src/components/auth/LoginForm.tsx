@@ -22,7 +22,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 import { fetchCustomer, loginSuccess } from "@/features/customerAuthSlice";
-import axios from "axios";
+import api from "@/lib/api";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/app/store";
 import { useEffect } from "react";
@@ -55,7 +55,7 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         import.meta.env.VITE_BASE_URL + "/api/auth/login",
         { email, password },
         {
@@ -91,7 +91,7 @@ export const LoginForm: React.FC<LoginFormProps> = () => {
     setPassword(demoPassword);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         import.meta.env.VITE_BASE_URL + "/api/auth/login",
         {
           email: demoEmail,
