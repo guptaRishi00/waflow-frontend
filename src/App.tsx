@@ -45,6 +45,7 @@ import ManagerVisaApplicationsPage from "./pages/manager/ManagerVisaApplications
 import { AgentProfilePage } from "./pages/manager/AgentProfilePage";
 import { AuthInitializer } from "./lib/AuthInitializer";
 import ApplicationPage from "./pages/customer/ApplicationPage";
+import { ApplicationDetailsPage } from "./pages/manager/ApplicationDetailsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -143,6 +144,10 @@ const AppRoutes = () => {
                 <Route
                   path="applications"
                   element={<ManagerApplicationsPage />}
+                />
+                <Route
+                  path="applications/:id"
+                  element={<ApplicationDetailsPage />}
                 />
                 <Route path="customers" element={<ManagerCustomersPage />} />
                 <Route path="directory" element={<ManagerDirectoryPage />} />
