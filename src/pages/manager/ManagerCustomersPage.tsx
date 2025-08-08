@@ -2688,7 +2688,7 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
       formData.append("applicationId", application._id);
 
       const response = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/document/upload`,
+        `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
         formData,
         {
           headers: {

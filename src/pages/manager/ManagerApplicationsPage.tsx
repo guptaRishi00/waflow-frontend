@@ -132,7 +132,7 @@ export const ManagerApplicationsPage: React.FC = () => {
   };
 
   const handleViewApplication = (application: ApplicationData) => {
-    navigate(`/manager/applications/${application._id}`);
+                    navigate(`/manager/applications/${application.applicationId}`);
   };
 
   const handleAssignAgent = (applicationId: string) => {

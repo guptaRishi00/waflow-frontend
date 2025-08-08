@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,27 +17,96 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Upload } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Upload,
+  Save,
+  Eye,
+  FileText,
+  Image,
+  X,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
 
 interface EditSectionModalProps {
   title: string;
   children: React.ReactNode;
   trigger: React.ReactNode;
+  applicationId?: string;
+  onSave?: (data: any) => Promise<void>;
+  onSaveSuccess?: () => void;
 }
 
 export const EditSectionModal: React.FC<EditSectionModalProps> = ({
   title,
   children,
   trigger,
+  applicationId,
+  onSave,
+  onSaveSuccess,
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    if (!onSave) return;
+
+    setIsSaving(true);
+    try {
+      await onSave({});
+      toast({
+        title: "Success",
+        description: `${title} updated successfully!`,
+      });
+      setIsOpen(false);
+      onSaveSuccess?.();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description:
+          error?.response?.data?.message ||
+          `Failed to update ${title.toLowerCase()}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit {title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">{children}</div>
+        <div className="space-y-4">
+          {children}
+          {onSave && (
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -46,11 +115,14 @@ export const EditSectionModal: React.FC<EditSectionModalProps> = ({
 interface ApplicationInfoFormProps {
   applicationDetails: any;
   setApplicationDetails: React.Dispatch<React.SetStateAction<any>>;
+  applicationId?: string;
+  customerId?: string;
 }
 
 export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
   applicationDetails,
   setApplicationDetails,
+  applicationId,
 }) => {
   return (
     <div className="space-y-4">
@@ -69,9 +141,9 @@ export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="freezone">Free Zone</SelectItem>
-            <SelectItem value="mainland">Mainland</SelectItem>
-            <SelectItem value="offshore">Offshore</SelectItem>
+            <SelectItem value="Freezone">Free Zone</SelectItem>
+            <SelectItem value="Mainland">Mainland</SelectItem>
+            <SelectItem value="Offshore">Offshore</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -92,9 +164,9 @@ export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
             <SelectItem value="Abu Dhabi">Abu Dhabi</SelectItem>
             <SelectItem value="Sharjah">Sharjah</SelectItem>
             <SelectItem value="Ajman">Ajman</SelectItem>
-            <SelectItem value="Ras Al Khaimah">Ras Al Khaimah</SelectItem>
+            <SelectItem value="RAK">Ras Al Khaimah</SelectItem>
             <SelectItem value="Fujairah">Fujairah</SelectItem>
-            <SelectItem value="Umm Al Quwain">Umm Al Quwain</SelectItem>
+            <SelectItem value="UAQ">Umm Al Quwain</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -112,33 +184,81 @@ export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="LLC">LLC</SelectItem>
-            <SelectItem value="FZE">FZE</SelectItem>
-            <SelectItem value="FZCO">FZCO</SelectItem>
-            <SelectItem value="Branch">Branch</SelectItem>
-            <SelectItem value="Representative Office">
-              Representative Office
+            <SelectItem value="Sole Proprietorship">
+              Sole Proprietorship
             </SelectItem>
+            <SelectItem value="Civil Company">Civil Company</SelectItem>
+            <SelectItem value="Branch">Branch</SelectItem>
+            <SelectItem value="Holding">Holding</SelectItem>
+            <SelectItem value="Freezone Company">Freezone Company</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div>
-        <Label>Assigned Agent</Label>
+        <Label>Office Requirement</Label>
         <Select
-          value={applicationDetails.assignedAgent}
+          value={applicationDetails.officeRequirement}
           onValueChange={(value) =>
-            setApplicationDetails((prev) => ({ ...prev, assignedAgent: value }))
+            setApplicationDetails((prev) => ({
+              ...prev,
+              officeRequirement: value,
+            }))
           }
         >
           <SelectTrigger className="mt-1">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Agent Smith">Agent Smith</SelectItem>
-            <SelectItem value="Agent Johnson">Agent Johnson</SelectItem>
-            <SelectItem value="Agent Williams">Agent Williams</SelectItem>
+            <SelectItem value="Required">Required</SelectItem>
+            <SelectItem value="Not Required">Not Required</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div>
+        <Label>Office Type</Label>
+        <Select
+          value={applicationDetails.officeType}
+          onValueChange={(value) =>
+            setApplicationDetails((prev) => ({ ...prev, officeType: value }))
+          }
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Flexi Desk">Flexi Desk</SelectItem>
+            <SelectItem value="Smart Office">Smart Office</SelectItem>
+            <SelectItem value="Executive Office">Executive Office</SelectItem>
+            <SelectItem value="Virtual Office">Virtual Office</SelectItem>
+            <SelectItem value="Warehouse">Warehouse</SelectItem>
+            <SelectItem value="Retail Shop / Showroom">
+              Retail Shop / Showroom
+            </SelectItem>
+            <SelectItem value="Business Centre Office">
+              Business Centre Office
+            </SelectItem>
+            <SelectItem value="Shared Office / Co-working Space">
+              Shared Office / Co-working Space
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>Total Agreed Cost</Label>
+        <Input
+          type="number"
+          value={applicationDetails.totalAgreedCost}
+          onChange={(e) =>
+            setApplicationDetails((prev) => ({
+              ...prev,
+              totalAgreedCost: parseFloat(e.target.value) || 0,
+            }))
+          }
+          placeholder="Enter total cost"
+        />
       </div>
 
       <div>
@@ -151,8 +271,8 @@ export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
               applicationNotes: e.target.value,
             }))
           }
-          className="mt-1 min-h-[80px]"
-          placeholder="Add general notes about the application..."
+          placeholder="Add any notes about this application..."
+          rows={3}
         />
       </div>
     </div>
@@ -162,6 +282,7 @@ export const ApplicationInfoForm: React.FC<ApplicationInfoFormProps> = ({
 export const CustomerInfoForm: React.FC<ApplicationInfoFormProps> = ({
   applicationDetails,
   setApplicationDetails,
+  applicationId,
 }) => {
   return (
     <div className="space-y-4">
@@ -185,6 +306,7 @@ export const CustomerInfoForm: React.FC<ApplicationInfoFormProps> = ({
 export const CompanyInfoForm: React.FC<ApplicationInfoFormProps> = ({
   applicationDetails,
   setApplicationDetails,
+  applicationId,
 }) => {
   return (
     <div className="space-y-4">
@@ -233,10 +355,8 @@ export const CompanyInfoForm: React.FC<ApplicationInfoFormProps> = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Virtual Office">Virtual Office</SelectItem>
-            <SelectItem value="Physical Office">Physical Office</SelectItem>
-            <SelectItem value="Flexi Desk">Flexi Desk</SelectItem>
-            <SelectItem value="Dedicated Desk">Dedicated Desk</SelectItem>
+            <SelectItem value="Required">Required</SelectItem>
+            <SelectItem value="Not Required">Not Required</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -253,9 +373,20 @@ export const CompanyInfoForm: React.FC<ApplicationInfoFormProps> = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Shared">Shared</SelectItem>
-            <SelectItem value="Private">Private</SelectItem>
-            <SelectItem value="Executive">Executive</SelectItem>
+            <SelectItem value="Flexi Desk">Flexi Desk</SelectItem>
+            <SelectItem value="Smart Office">Smart Office</SelectItem>
+            <SelectItem value="Executive Office">Executive Office</SelectItem>
+            <SelectItem value="Virtual Office">Virtual Office</SelectItem>
+            <SelectItem value="Warehouse">Warehouse</SelectItem>
+            <SelectItem value="Retail Shop / Showroom">
+              Retail Shop / Showroom
+            </SelectItem>
+            <SelectItem value="Business Centre Office">
+              Business Centre Office
+            </SelectItem>
+            <SelectItem value="Shared Office / Co-working Space">
+              Shared Office / Co-working Space
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -468,9 +599,262 @@ export const ShareholderInfoForm: React.FC<ApplicationInfoFormProps> = ({
   );
 };
 
+// Custom ReceiptUpload component for handling existing receipts and new uploads
+const ReceiptUpload: React.FC<{
+  existingReceipt?: string | null;
+  onReceiptChange: (file: File | null, existingUrl?: string | null) => void;
+  applicationId?: string;
+  customerId?: string;
+}> = ({ existingReceipt, onReceiptChange, applicationId, customerId }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { token } = useSelector((state: RootState) => state.customerAuth);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Handle file selection and upload
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [".jpg", ".jpeg", ".png", ".pdf"];
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+    const isValidType = allowedTypes.includes(fileExtension);
+
+    if (!isValidType) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a JPG, PNG, or PDF file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreviewUrl(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
+    }
+
+    // Upload file to backend
+    if (applicationId && customerId && token) {
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("documentName", `Receipt - ${file.name}`);
+        formData.append("documentType", "Receipt");
+        formData.append("linkedTo", customerId);
+        formData.append("linkedModel", "Customer");
+        formData.append("relatedStepName", "Payment & License Issuance");
+
+        const response = await axios.post(
+          `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        const uploadedUrl = response.data.data.fileUrl;
+        onReceiptChange(null, uploadedUrl);
+
+        toast({
+          title: "Receipt Uploaded",
+          description: "Receipt has been uploaded successfully!",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Upload Failed",
+          description:
+            error?.response?.data?.message || "Failed to upload receipt",
+          variant: "destructive",
+        });
+        // Reset file selection on error
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      // Fallback for when we don't have the required IDs
+      onReceiptChange(file, null);
+    }
+  };
+
+  const handleRemove = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    onReceiptChange(null, null);
+  };
+
+  const handlePreview = (url: string) => {
+    window.open(url, "_blank");
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split(".").pop()?.toLowerCase();
+    return extension === "pdf" ? (
+      <FileText className="w-4 h-4" />
+    ) : (
+      <Image className="w-4 h-4" />
+    );
+  };
+
+  const getFileName = (url: string) => {
+    const parts = url.split("/");
+    return parts[parts.length - 1] || "Receipt";
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Show existing receipt if available */}
+      {existingReceipt && !selectedFile && (
+        <div className="border rounded-lg p-3 bg-green-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {getFileIcon(getFileName(existingReceipt))}
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Existing Receipt
+                </p>
+                <p className="text-xs text-gray-500">
+                  {getFileName(existingReceipt)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => handlePreview(existingReceipt)}
+              >
+                <Eye className="w-4 h-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onReceiptChange(null, null)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload new receipt */}
+      {!existingReceipt && !selectedFile && (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-[#0b1d9b] transition-colors">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full"
+            disabled={isUploading}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {isUploading ? "Uploading..." : "Upload Receipt"}
+          </Button>
+          <p className="text-xs text-gray-500 mt-1">Max 5MB • JPG, PNG, PDF</p>
+        </div>
+      )}
+
+      {/* Show selected file */}
+      {selectedFile && (
+        <div className="border rounded-lg p-3 bg-blue-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {getFileIcon(selectedFile.name)}
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedFile.name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {previewUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePreview(previewUrl)}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleRemove}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          {previewUrl && (
+            <div className="mt-3">
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="max-w-full h-32 object-cover rounded border"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const PaymentDetailsForm: React.FC<ApplicationInfoFormProps> = ({
   applicationDetails,
   setApplicationDetails,
+  applicationId,
+  customerId,
 }) => {
   const addPaymentEntry = () => {
     const newEntry = {
@@ -648,10 +1032,25 @@ export const PaymentDetailsForm: React.FC<ApplicationInfoFormProps> = ({
 
               <div>
                 <Label className="text-sm">Receipt Upload</Label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-3 text-center mt-1">
-                  <Upload className="h-6 w-6 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500">Upload receipt</p>
-                </div>
+                <ReceiptUpload
+                  existingReceipt={payment.receipt}
+                  applicationId={applicationId}
+                  customerId={customerId}
+                  onReceiptChange={(file, existingUrl) => {
+                    const updated = [...applicationDetails.paymentEntries];
+                    if (file) {
+                      // Handle new file upload - in a real app, you'd upload to server here
+                      updated[index].receipt = file.name; // For now, just store filename
+                    } else if (existingUrl !== undefined) {
+                      // Handle existing URL removal or new URL
+                      updated[index].receipt = existingUrl;
+                    }
+                    setApplicationDetails((prev) => ({
+                      ...prev,
+                      paymentEntries: updated,
+                    }));
+                  }}
+                />
               </div>
 
               <div>

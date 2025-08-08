@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,12 +43,16 @@ import {
   Plus,
   Trash2,
   Edit3,
+  Eye,
 } from "lucide-react";
 import { NotesModule } from "@/components/common/NotesModule";
-import { mockApplications } from "@/lib/mock-data";
-import { useSelector } from "react-redux";
+// import { mockApplications } from "@/lib/mock-data";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/app/store";
 import api from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { logout } from "@/features/customerAuthSlice";
+
 import {
   ApplicationInfoForm,
   CompanyInfoForm,
@@ -88,38 +92,44 @@ const statusIcons = {
 
 export const ApplicationDetailsPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user, token } = useSelector((state: RootState) => state.customerAuth);
   const [activeTab, setActiveTab] = useState("workflow");
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
   const [applicationData, setApplicationData] = useState<any>(null);
 
   // Mock application data - in real app, fetch by ID
-  const application = mockApplications[0];
+  // const application = mockApplications[0];
 
   console.log("Application ID from params:", id);
 
+  // Function to fetch application data
+  const fetchApplication = async () => {
+    if (!id || !token) return;
+
+    try {
+      // The id parameter is now the applicationId (e.g., "APP-0001")
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log("Fetched application:", response.data.data);
+      setApplicationData(response.data.data);
+    } catch (error) {
+      console.error("Error fetching application:", error.message);
+    }
+  };
+
   // Fetch application by ID
   useEffect(() => {
-    if (id) {
-      const fetchApplication = async () => {
-        try {
-          const response = await axios.get(
-            `${import.meta.env.VITE_BASE_URL}/api/application/${id}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          console.log("Fetched application:", response.data.data);
-          setApplicationData(response.data.data);
-        } catch (error) {
-          console.error("Error fetching application:", error.message);
-        }
-      };
-
-      fetchApplication();
-    }
-  }, [id]);
+    fetchApplication();
+  }, [id, token]);
 
   // Update applicationDetails when API data is fetched
   useEffect(() => {
@@ -287,6 +297,118 @@ export const ApplicationDetailsPage: React.FC = () => {
     );
   };
 
+  const handleFileUpload = async (file: File, stepName: string) => {
+    console.log("Uploading file:", file.name, "for step:", stepName);
+
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Create document via backend API - let backend handle Cloudinary upload
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("documentName", file.name);
+      formData.append("documentType", "General");
+      formData.append("relatedStepName", stepName);
+      formData.append("linkedModel", "Application");
+      formData.append("applicationId", applicationData?._id || "");
+
+      console.log("Sending formData with:");
+      console.log("- file:", file.name, file.size, file.type);
+      console.log("- documentName:", file.name);
+      console.log("- documentType: General");
+      console.log("- relatedStepName:", stepName);
+      console.log("- linkedModel: Application");
+      console.log("- applicationId:", applicationData?._id);
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      toast({
+        title: "Document uploaded",
+        description: "Document has been uploaded successfully",
+      });
+
+      // Refresh application data to show new document
+      if (id) {
+        fetchApplication();
+      }
+    } catch (error: any) {
+      console.error("Error uploading document:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to upload document. Please try again.";
+
+      // Check if the error is related to authentication (401, 403)
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast({
+          title: "Authentication Error",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+
+        // Dispatch logout action to clear auth state
+        dispatch(logout());
+
+        // Redirect to login page
+        navigate("/auth");
+        return;
+      }
+
+      // For other errors, only show the error message without redirecting
+      toast({
+        title: "Upload failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    stepName: string
+  ) => {
+    console.log("File input changed for step:", stepName);
+    const file = e.target.files?.[0];
+    if (file) {
+      console.log(
+        "File selected:",
+        file.name,
+        "Size:",
+        file.size,
+        "Type:",
+        file.type
+      );
+      handleFileUpload(file, stepName);
+    } else {
+      console.log("No file selected");
+    }
+    // Reset the input value so the same file can be selected again
+    e.target.value = "";
+  };
+
   const getStepState = (stepIndex: number) => {
     const completedSteps = workflowSteps.filter(
       (step) => step.status === "approved"
@@ -400,18 +522,22 @@ export const ApplicationDetailsPage: React.FC = () => {
                 {/* Document Upload */}
                 <div className="space-y-3">
                   <h4 className="font-medium">Documents</h4>
-                  {stepState === "active" && (
-                    <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center">
-                      <Upload className="h-8 w-8 mx-auto text-blue-400 mb-2" />
-                      <p className="text-sm text-gray-600 mb-2">
-                        Upload documents for this step
-                      </p>
-                      <Button variant="outline" size="sm">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Choose Files
-                      </Button>
+                  <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center">
+                    <Upload className="h-8 w-8 mx-auto text-blue-400 mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">
+                      Upload documents for this step
+                    </p>
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="file"
+                        onChange={(e) => handleFileInputChange(e, step.title)}
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        disabled={isUploading}
+                        id={`file-input-${step.id}`}
+                      />
                     </div>
-                  )}
+                  </div>
 
                   {/* Uploaded documents */}
                   <div className="space-y-2">
@@ -622,10 +748,47 @@ export const ApplicationDetailsPage: React.FC = () => {
                               <Edit3 className="h-4 w-4" />
                             </div>
                           }
+                          applicationId={applicationData?.applicationId}
+                          onSaveSuccess={fetchApplication}
+                          onSave={async () => {
+                            if (!applicationData?.applicationId || !token)
+                              return;
+
+                            const updateData = {
+                              applicationType:
+                                applicationDetails.applicationType,
+                              emirate: applicationDetails.emirate,
+                              legalForm: applicationDetails.legalForm,
+                              proposedCompanyNamesEN:
+                                applicationDetails.proposedCompanyNames,
+
+                              officeRequired:
+                                applicationDetails.officeRequirement ===
+                                "Required",
+                              officeType: applicationDetails.officeType,
+                              applicationNotes:
+                                applicationDetails.applicationNotes,
+                              totalAgreedCost:
+                                applicationDetails.totalAgreedCost,
+                            };
+
+                            await axios.patch(
+                              `${
+                                import.meta.env.VITE_BASE_URL
+                              }/api/application/customer/${
+                                applicationData.applicationId
+                              }`,
+                              updateData,
+                              {
+                                headers: { Authorization: `Bearer ${token}` },
+                              }
+                            );
+                          }}
                         >
                           <ApplicationInfoForm
                             applicationDetails={applicationDetails}
                             setApplicationDetails={setApplicationDetails}
+                            applicationId={applicationData?.applicationId}
                           />
                         </EditSectionModal>
                       </AccordionTrigger>
@@ -682,10 +845,33 @@ export const ApplicationDetailsPage: React.FC = () => {
                               <Edit3 className="h-4 w-4" />
                             </div>
                           }
+                          applicationId={applicationData?.applicationId}
+                          onSaveSuccess={fetchApplication}
+                          onSave={async () => {
+                            if (!applicationData?.applicationId || !token)
+                              return;
+
+                            const updateData = {
+                              customerName: applicationDetails.customerName,
+                            };
+
+                            await axios.patch(
+                              `${
+                                import.meta.env.VITE_BASE_URL
+                              }/api/application/customer/${
+                                applicationData.applicationId
+                              }`,
+                              updateData,
+                              {
+                                headers: { Authorization: `Bearer ${token}` },
+                              }
+                            );
+                          }}
                         >
                           <CustomerInfoForm
                             applicationDetails={applicationDetails}
                             setApplicationDetails={setApplicationDetails}
+                            applicationId={applicationData?.applicationId}
                           />
                         </EditSectionModal>
                       </AccordionTrigger>
@@ -889,10 +1075,38 @@ export const ApplicationDetailsPage: React.FC = () => {
                               <Edit3 className="h-4 w-4" />
                             </div>
                           }
+                          applicationId={applicationData?.applicationId}
+                          onSaveSuccess={fetchApplication}
+                          onSave={async () => {
+                            if (!applicationData?.applicationId || !token)
+                              return;
+
+                            const updateData = {
+                              proposedCompanyNamesEN:
+                                applicationDetails.proposedCompanyNames,
+                              officeRequired:
+                                applicationDetails.officeRequirement ===
+                                "Required",
+                              officeType: applicationDetails.officeType,
+                            };
+
+                            await axios.patch(
+                              `${
+                                import.meta.env.VITE_BASE_URL
+                              }/api/application/customer/${
+                                applicationData.applicationId
+                              }`,
+                              updateData,
+                              {
+                                headers: { Authorization: `Bearer ${token}` },
+                              }
+                            );
+                          }}
                         >
                           <CompanyInfoForm
                             applicationDetails={applicationDetails}
                             setApplicationDetails={setApplicationDetails}
+                            applicationId={applicationData?.applicationId}
                           />
                         </EditSectionModal>
                       </AccordionTrigger>
@@ -1056,6 +1270,28 @@ export const ApplicationDetailsPage: React.FC = () => {
                               <Edit3 className="h-4 w-4" />
                             </div>
                           }
+                          applicationId={applicationData?.applicationId}
+                          onSaveSuccess={fetchApplication}
+                          onSave={async () => {
+                            if (!applicationData?.applicationId || !token)
+                              return;
+
+                            const updateData = {
+                              shareholders: applicationDetails.shareholders,
+                            };
+
+                            await axios.patch(
+                              `${
+                                import.meta.env.VITE_BASE_URL
+                              }/api/application/customer/${
+                                applicationData.applicationId
+                              }`,
+                              updateData,
+                              {
+                                headers: { Authorization: `Bearer ${token}` },
+                              }
+                            );
+                          }}
                         >
                           <ShareholderInfoForm
                             applicationDetails={applicationDetails}
@@ -1416,10 +1652,43 @@ export const ApplicationDetailsPage: React.FC = () => {
                           <Edit3 className="h-4 w-4" />
                         </div>
                       }
+                      applicationId={applicationData?._id}
+                      onSaveSuccess={fetchApplication}
+                      onSave={async () => {
+                        if (!applicationData?.applicationId || !token) return;
+
+                        const updateData = {
+                          paymentEntries: applicationDetails.paymentEntries.map(
+                            (payment: any) => ({
+                              paymentMethod: payment.method,
+                              amountPaid: payment.amount,
+                              paymentDate: payment.date,
+                              transactionRefNo: payment.reference,
+                              paymentStatus: payment.status,
+                              additionalNotes: payment.notes,
+                            })
+                          ),
+                          totalAgreedCost: applicationDetails.totalAgreedCost,
+                        };
+
+                        await axios.patch(
+                          `${
+                            import.meta.env.VITE_BASE_URL
+                          }/api/application/customer/${
+                            applicationData.applicationId
+                          }`,
+                          updateData,
+                          {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }
+                        );
+                      }}
                     >
                       <PaymentDetailsForm
                         applicationDetails={applicationDetails}
                         setApplicationDetails={setApplicationDetails}
+                        applicationId={applicationData?.applicationId}
+                        customerId={applicationData?.customer?._id}
                       />
                     </EditSectionModal>
                   </div>
@@ -1578,23 +1847,46 @@ export const ApplicationDetailsPage: React.FC = () => {
                               Receipt Upload
                             </Label>
                             {payment.receiptUpload ? (
-                              <div className="border rounded p-2">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-green-600" />
-                                  <a
-                                    href={payment.receiptUpload}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-blue-600 hover:underline"
-                                  >
-                                    View Receipt
-                                  </a>
+                              <div className="border rounded-lg p-3 bg-green-50">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-green-600" />
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        Receipt Uploaded
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {payment.receiptUpload
+                                          .split("/")
+                                          .pop() || "Receipt"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        window.open(
+                                          payment.receiptUpload,
+                                          "_blank"
+                                        )
+                                      }
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             ) : (
-                              <div className="border-2 border-dashed border-gray-300 rounded p-2 text-center">
-                                <Upload className="h-4 w-4 mx-auto text-gray-400 mb-1" />
-                                <p className="text-xs text-gray-500">N/A</p>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50">
+                                <Upload className="h-5 w-5 mx-auto text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-500">
+                                  No receipt uploaded
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Receipt can be uploaded in edit mode
+                                </p>
                               </div>
                             )}
                           </div>
