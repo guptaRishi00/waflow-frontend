@@ -1238,13 +1238,21 @@ export const ManagerCustomersPage: React.FC = () => {
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {agents
-                        .filter((agent) => agent.status === "active")
-                        .map((agent) => (
+                      {(() => {
+                        console.log("All agents:", agents);
+                        const activeAgents = agents.filter((agent) => {
+                          // Handle different cases and default to active if no status
+                          const status =
+                            agent.status?.toLowerCase() || "active";
+                          return status === "active";
+                        });
+                        console.log("Active agents:", activeAgents);
+                        return activeAgents.map((agent) => (
                           <SelectItem key={agent._id} value={agent._id}>
                             {agent.fullName} ({agent.email})
                           </SelectItem>
-                        ))}
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                   {createFormErrors.assignedAgentId && (
@@ -1666,7 +1674,12 @@ export const ManagerCustomersPage: React.FC = () => {
                           <SelectItem value="all">All Assignments</SelectItem>
                           <SelectItem value="unassigned">Unassigned</SelectItem>
                           {agents
-                            .filter((agent) => agent.status === "active")
+                            .filter((agent) => {
+                              // Handle different cases and default to active if no status
+                              const status =
+                                agent.status?.toLowerCase() || "active";
+                              return status === "active";
+                            })
                             .map((agent) => (
                               <SelectItem key={agent._id} value={agent._id}>
                                 {agent.fullName}

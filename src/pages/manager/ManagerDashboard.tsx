@@ -15,7 +15,6 @@ import {
   Bell,
   TrendingUp,
   Clock,
-  RefreshCw,
   CheckCircle,
   AlertCircle,
   UserCheck,
@@ -77,7 +76,6 @@ export const ManagerDashboard: React.FC = () => {
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [allApplications, setAllApplications] = useState<Application[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Memoized fetch functions to prevent unnecessary re-renders
   const fetchAgents = useCallback(async () => {
@@ -230,52 +228,59 @@ export const ManagerDashboard: React.FC = () => {
 
   console.log("Recent Agents:", recentAgents.length);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([
-        fetchAgents(),
-        fetchCustomers(),
-        fetchApplications(),
-        fetchNotifications(),
-      ]);
-      toast({
-        title: "Refreshed",
-        description: "Dashboard data has been updated.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to refresh dashboard data.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   console.log("All Applications:", allApplications.length);
   console.log("Applications data:", allApplications);
   console.log("All Customers:", allCustomers.length);
   console.log("Customers data:", allCustomers);
 
-  // Calculate application status breakdown
+  // Debug: Log all application statuses
+  console.log("All applications:", allApplications);
+  console.log(
+    "Application statuses:",
+    allApplications.map((app) => app.status)
+  );
+  console.log("Status counts:", {
+    total: allApplications.length,
+    new: allApplications.filter((app) => app.status === "New").length,
+    waitingReview: allApplications.filter(
+      (app) => app.status === "Waiting for Agent Review"
+    ).length,
+    readyForProcessing: allApplications.filter(
+      (app) => app.status === "Ready for Processing"
+    ).length,
+    inProgress: allApplications.filter((app) => app.status === "In Progress")
+      .length,
+    completed: allApplications.filter((app) => app.status === "Completed")
+      .length,
+    rejected: allApplications.filter((app) => app.status === "Rejected").length,
+    awaitingClient: allApplications.filter(
+      (app) => app.status === "Awaiting Client Response"
+    ).length,
+  });
+
+  // Calculate application status breakdown (matching backend enum values)
   const applicationStatusCounts = {
     inProgress: allApplications.filter((app) => app.status === "In Progress")
       .length,
     awaitingClientAction: allApplications.filter(
-      (app) => app.status === "Awaiting Client Action"
+      (app) => app.status === "Awaiting Client Response"
     ).length,
-    underReview: allApplications.filter((app) => app.status === "Under Review")
+    underReview: allApplications.filter(
+      (app) =>
+        app.status === "Waiting for Agent Review" ||
+        app.status === "Ready for Processing"
+    ).length,
+    approved: allApplications.filter((app) => app.status === "Completed")
       .length,
-    approved: allApplications.filter((app) => app.status === "Approved").length,
     rejected: allApplications.filter((app) => app.status === "Rejected").length,
   };
+
+  console.log("Dashboard status counts:", applicationStatusCounts);
 
   // Calculate completion rate
   const totalApplications = allApplications.length;
   const completedApplications = allApplications.filter(
-    (app) => app.status === "Completed" || app.status === "Approved"
+    (app) => app.status === "Completed"
   ).length;
   const completionRate =
     totalApplications > 0
@@ -284,7 +289,7 @@ export const ManagerDashboard: React.FC = () => {
 
   // Calculate pending applications (not completed)
   const pendingApplications = allApplications.filter(
-    (app) => app.status !== "Completed" && app.status !== "Approved"
+    (app) => app.status !== "Completed" && app.status !== "Rejected"
   ).length;
 
   // Calculate active agents
@@ -372,17 +377,6 @@ export const ManagerDashboard: React.FC = () => {
             Overview of all operations and performance
           </p>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          {isRefreshing ? "Refreshing..." : "Refresh"}
-        </Button>
       </div>
 
       {/* Application Status Row */}
@@ -627,13 +621,9 @@ export const ManagerDashboard: React.FC = () => {
                                       customerApplication.status ===
                                         "Waiting for Agent Review"
                                     ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                                    : customerApplication.status ===
-                                        "Completed" ||
-                                      customerApplication.status === "Approved"
+                                    : customerApplication.status === "Completed"
                                     ? "bg-green-100 text-green-800 border-green-200"
-                                    : customerApplication.status ===
-                                        "Rejected" ||
-                                      customerApplication.status === "Declined"
+                                    : customerApplication.status === "Rejected"
                                     ? "bg-red-100 text-red-800 border-red-200"
                                     : customerApplication.status ===
                                       "Awaiting Client Response"
@@ -698,40 +688,6 @@ export const ManagerDashboard: React.FC = () => {
                   }}
                 >
                   Clear All
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (token && user?.userId) {
-                      const fetchNotifications = async () => {
-                        setLoadingNotifications(true);
-                        try {
-                          const response = await axios.get(
-                            `${
-                              import.meta.env.VITE_BASE_URL
-                            }/api/notification/admin/${user.userId}`,
-                            {
-                              headers: { Authorization: `Bearer ${token}` },
-                            }
-                          );
-                          setNotifications(response.data.data || []);
-                        } catch (error) {
-                          console.error("Error fetching notifications:", error);
-                        } finally {
-                          setLoadingNotifications(false);
-                        }
-                      };
-                      fetchNotifications();
-                    }
-                  }}
-                  disabled={loadingNotifications}
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${
-                      loadingNotifications ? "animate-spin" : ""
-                    }`}
-                  />
                 </Button>
               </div>
             </div>

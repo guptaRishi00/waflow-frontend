@@ -132,7 +132,7 @@ export const ManagerApplicationsPage: React.FC = () => {
   };
 
   const handleViewApplication = (application: ApplicationData) => {
-                    navigate(`/manager/applications/${application.applicationId}`);
+    navigate(`/manager/applications/${application.applicationId}`);
   };
 
   const handleAssignAgent = (applicationId: string) => {
@@ -513,7 +513,11 @@ export const ManagerApplicationsPage: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {agents
-                    .filter((agent) => agent.status === "active")
+                    .filter((agent) => {
+                      // Handle different cases and default to active if no status
+                      const status = agent.status?.toLowerCase() || "active";
+                      return status === "active";
+                    })
                     .map((agent) => (
                       <SelectItem key={agent._id} value={agent._id}>
                         {agent.fullName} ({agent.email})

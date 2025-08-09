@@ -276,11 +276,17 @@ export const ApplicationDetailsPage: React.FC = () => {
             uploadedAt: doc.uploadedAt,
           }));
 
+        // Ensure first step is always available for upload
+        let stepStatus = mapStatus(step.status) as WorkflowStep["status"];
+        if (index === 0 && stepStatus === "not-started") {
+          stepStatus = "submitted";
+        }
+
         return {
           id: step._id || `step-${index}`,
           title: step.stepName,
           icon: getStepIcon(step.stepName),
-          status: mapStatus(step.status) as WorkflowStep["status"],
+          status: stepStatus,
           internalNotes: "",
           customerNotes: "",
           documents: stepDocuments,
@@ -317,15 +323,71 @@ export const ApplicationDetailsPage: React.FC = () => {
     return Math.round((completedSteps / totalSteps) * 100);
   };
 
-  const updateStepStatus = (
+  const updateStepStatus = async (
     stepId: string,
     newStatus: WorkflowStep["status"]
   ) => {
-    setWorkflowSteps((prev) =>
-      prev.map((step) =>
-        step.id === stepId ? { ...step, status: newStatus } : step
-      )
-    );
+    try {
+      // Map the UI status back to the backend enum
+      const mapToBackendStatus = (status: WorkflowStep["status"]) => {
+        switch (status) {
+          case "not-started":
+            return "Not Started";
+          case "submitted":
+            return "Submitted for Review";
+          case "awaiting":
+            return "Awaiting Response";
+          case "approved":
+            return "Approved";
+          case "declined":
+            return "Declined";
+          default:
+            return "Not Started";
+        }
+      };
+
+      // Find the step to get its name
+      const step = workflowSteps.find((s) => s.id === stepId);
+      if (!step) {
+        throw new Error("Step not found");
+      }
+
+      const backendStatus = mapToBackendStatus(newStatus);
+
+      const response = await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
+          applicationData._id
+        }`,
+        {
+          stepName: step.title,
+          status: backendStatus,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        // Update local state
+        setWorkflowSteps((prev) =>
+          prev.map((s) => (s.id === stepId ? { ...s, status: newStatus } : s))
+        );
+
+        toast({
+          title: "Step Status Updated",
+          description: `${step.title} status updated to ${backendStatus}`,
+        });
+      } else {
+        throw new Error("Failed to update step status");
+      }
+    } catch (error) {
+      console.error("Error updating step status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update step status",
+        variant: "destructive",
+      });
+    }
   };
 
   const updateStepNotes = (
@@ -456,13 +518,149 @@ export const ApplicationDetailsPage: React.FC = () => {
     e.target.value = "";
   };
 
+  // Handle document status change
+  const handleDocumentStatusChange = async (
+    documentId: string,
+    newStatus: string
+  ) => {
+    try {
+      console.log(`Updating document ${documentId} status to ${newStatus}`);
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/api/document/${documentId}`,
+        { status: newStatus },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        // Update the local state
+        setApplicationDocuments((prev) =>
+          prev.map((doc) =>
+            doc._id === documentId ? { ...doc, status: newStatus } : doc
+          )
+        );
+
+        // Also update the workflowSteps state
+        setWorkflowSteps((prev) =>
+          prev.map((step) => ({
+            ...step,
+            documents: step.documents?.map((doc) =>
+              doc._id === documentId ? { ...doc, status: newStatus } : doc
+            ),
+          }))
+        );
+
+        toast({
+          title: "Status Updated",
+          description: `Document status updated to ${newStatus}`,
+        });
+
+        // If document is approved, check if next step should be unlocked
+        // But only if this is not part of a bulk update
+        if (newStatus === "Approved" && !(window as any).bulkUpdateInProgress) {
+          checkAndUnlockNextStep(documentId);
+        }
+      } else {
+        throw new Error("Failed to update document status");
+      }
+    } catch (error) {
+      console.error("Error updating document status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update document status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Check if next step should be unlocked based on document approval
+  const checkAndUnlockNextStep = async (documentId: string) => {
+    try {
+      console.log("checkAndUnlockNextStep called for document:", documentId);
+
+      // Find the document and its related step
+      const document = applicationDocuments.find(
+        (doc) => doc._id === documentId
+      );
+      if (!document || !document.relatedStepName) {
+        console.log("Document not found or no relatedStepName:", document);
+        return;
+      }
+
+      // Find the step index
+      const currentStepIndex = workflowSteps.findIndex(
+        (step) => step.title === document.relatedStepName
+      );
+
+      if (currentStepIndex === -1) {
+        console.log("Step not found for:", document.relatedStepName);
+        return;
+      }
+
+      // Check if all documents for current step are approved
+      const currentStepDocuments = applicationDocuments.filter(
+        (doc) => doc.relatedStepName === document.relatedStepName
+      );
+
+      console.log(
+        "Current step documents:",
+        currentStepDocuments.map((d) => ({
+          name: d.documentName,
+          status: d.status,
+        }))
+      );
+
+      const allApproved = currentStepDocuments.every(
+        (doc) => doc.status === "Approved"
+      );
+
+      console.log("All documents approved?", allApproved);
+
+      if (allApproved) {
+        // Mark current step as approved
+        const updatedSteps = [...workflowSteps];
+        updatedSteps[currentStepIndex] = {
+          ...workflowSteps[currentStepIndex],
+          status: "approved",
+        };
+
+        // Update next step status to allow uploads
+        if (currentStepIndex < workflowSteps.length - 1) {
+          const nextStep = workflowSteps[currentStepIndex + 1];
+          if (nextStep && nextStep.status === "not-started") {
+            updatedSteps[currentStepIndex + 1] = {
+              ...nextStep,
+              status: "submitted",
+            };
+
+            toast({
+              title: "Next Step Unlocked",
+              description: `${nextStep.title} is now available for document upload`,
+            });
+          }
+        }
+
+        setWorkflowSteps(updatedSteps);
+
+        // Update step status on backend
+        await updateStepStatus(workflowSteps[currentStepIndex].id, "approved");
+      }
+    } catch (error) {
+      console.error("Error checking next step unlock:", error);
+    }
+  };
+
   const getStepState = (stepIndex: number) => {
-    const completedSteps = workflowSteps.filter(
-      (step) => step.status === "approved"
-    ).length;
-    if (stepIndex < completedSteps) return "completed";
-    if (stepIndex === completedSteps) return "active";
-    return "upcoming";
+    const step = workflowSteps[stepIndex];
+    if (!step) return "upcoming";
+
+    // Check if step is completed (approved)
+    if (step.status === "approved") return "completed";
+
+    // Make ALL steps available for upload (active) regardless of previous step status
+    return "active";
   };
 
   const renderWorkflowStep = (
@@ -471,9 +669,7 @@ export const ApplicationDetailsPage: React.FC = () => {
     isSubstep = false
   ) => {
     const stepState = getStepState(stepIndex);
-    const isEditable =
-      stepState === "active" &&
-      (user?.role === "manager" || user?.role === "agent");
+    const isEditable = user?.role === "manager" || user?.role === "agent";
 
     const getStepColor = () => {
       if (stepState === "completed") return "bg-green-500 border-green-200";
@@ -501,6 +697,29 @@ export const ApplicationDetailsPage: React.FC = () => {
           }`}
         >
           <CardHeader className="pb-3">
+            {isEditable && (
+              <div className="flex justify-end mb-3">
+                <Select
+                  value={step.status}
+                  onValueChange={(value) =>
+                    updateStepStatus(step.id, value as WorkflowStep["status"])
+                  }
+                >
+                  <SelectTrigger className="h-8 w-[160px] text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not-started">Not Started</SelectItem>
+                    <SelectItem value="submitted">
+                      Submitted for Review
+                    </SelectItem>
+                    <SelectItem value="awaiting">Awaiting Response</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="declined">Declined</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center gap-4">
               <div
                 className={`w-12 h-12 rounded-full flex items-center justify-center ${getStepColor()} text-white shadow-lg`}
@@ -508,8 +727,60 @@ export const ApplicationDetailsPage: React.FC = () => {
                 {step.icon}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-lg">{step.title}</h3>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="font-semibold text-lg">{step.title}</h3>
+                  {step.documents && step.documents.length > 0 && (
+                    <Select
+                      value={step.documents[0]?.status || undefined}
+                      onValueChange={async (newStatus) => {
+                        // Set flag to prevent individual checkAndUnlockNextStep calls
+                        (window as any).bulkUpdateInProgress = true;
+
+                        try {
+                          // Update all documents in this step
+                          for (const doc of step.documents || []) {
+                            await handleDocumentStatusChange(
+                              doc._id,
+                              newStatus
+                            );
+                          }
+
+                          // After all documents are updated, check if next step should be unlocked
+                          if (
+                            newStatus === "Approved" &&
+                            step.documents &&
+                            step.documents.length > 0
+                          ) {
+                            // Use the first document to trigger the step unlock check
+                            await checkAndUnlockNextStep(step.documents[0]._id);
+                          }
+                        } finally {
+                          // Clear the flag
+                          (window as any).bulkUpdateInProgress = false;
+                        }
+
+                        // Force re-render to hide the dropdown
+                        setApplicationData({ ...applicationData });
+                      }}
+                    >
+                      <SelectTrigger className="h-7 w-32 text-xs">
+                        <SelectValue placeholder="Set Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Uploaded">Uploaded</SelectItem>
+                        <SelectItem value="Under Review">
+                          Under Review
+                        </SelectItem>
+                        <SelectItem value="Approved">Approved</SelectItem>
+                        <SelectItem value="Rejected">Rejected</SelectItem>
+                        <SelectItem value="Resubmission Required">
+                          Resubmission Required
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
                   {statusIcons[step.status]}
                   <Badge
                     variant={
@@ -518,32 +789,6 @@ export const ApplicationDetailsPage: React.FC = () => {
                   >
                     {step.status.replace("-", " ").toUpperCase()}
                   </Badge>
-                  {isEditable && (
-                    <Select
-                      value={step.status}
-                      onValueChange={(value) =>
-                        updateStepStatus(
-                          step.id,
-                          value as WorkflowStep["status"]
-                        )
-                      }
-                    >
-                      <SelectTrigger className="w-[180px] ml-4">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not-started">Not Started</SelectItem>
-                        <SelectItem value="submitted">
-                          Submitted for Review
-                        </SelectItem>
-                        <SelectItem value="awaiting">
-                          Awaiting Response
-                        </SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="declined">Declined</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               </div>
             </div>
@@ -682,7 +927,13 @@ export const ApplicationDetailsPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="default" className="text-xs">
+                            <Badge
+                              variant={
+                                document.status === "Approved"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
                               {document.status || "Uploaded"}
                             </Badge>
                             {document.url && (
@@ -1723,19 +1974,36 @@ export const ApplicationDetailsPage: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant={
-                                      document.status === "Uploaded" ||
-                                      document.status === "Approved"
-                                        ? "default"
-                                        : document.status === "Rejected"
-                                        ? "destructive"
-                                        : "secondary"
+                                  <Select
+                                    value={document.status || "Uploaded"}
+                                    onValueChange={(newStatus) =>
+                                      handleDocumentStatusChange(
+                                        document._id,
+                                        newStatus
+                                      )
                                     }
-                                    className="text-xs"
                                   >
-                                    {document.status || "Uploaded"}
-                                  </Badge>
+                                    <SelectTrigger className="h-6 w-28 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Uploaded">
+                                        Uploaded
+                                      </SelectItem>
+                                      <SelectItem value="Under Review">
+                                        Under Review
+                                      </SelectItem>
+                                      <SelectItem value="Approved">
+                                        Approved
+                                      </SelectItem>
+                                      <SelectItem value="Rejected">
+                                        Rejected
+                                      </SelectItem>
+                                      <SelectItem value="Resubmission Required">
+                                        Resubmission Required
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                   {document.fileUrl && (
                                     <Button
                                       size="sm"
@@ -2260,3 +2528,5 @@ export const ApplicationDetailsPage: React.FC = () => {
     </div>
   );
 };
+
+export default ApplicationDetailsPage;

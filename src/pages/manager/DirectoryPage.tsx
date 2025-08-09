@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, Eye, Upload, Filter } from "lucide-react";
+import { Search, Eye, Upload, Filter } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -49,6 +49,7 @@ export const DirectoryPage: React.FC = () => {
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [documentSearchTerm, setDocumentSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -85,6 +86,7 @@ export const DirectoryPage: React.FC = () => {
         );
 
         const customersData = customersResponse.data.data || [];
+        console.log("Customers loaded:", customersData.length);
         setCustomers(customersData);
 
         // Also fetch applications for reference
@@ -93,6 +95,7 @@ export const DirectoryPage: React.FC = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const apps = applicationsResponse.data.data || [];
+        console.log("Applications loaded:", apps.length);
         setApplications(apps);
       } catch (err) {
         toast({
@@ -113,15 +116,62 @@ export const DirectoryPage: React.FC = () => {
     const fetchDocs = async () => {
       if (!selectedCustomer || !token) return;
       setLoadingDocs(true);
+      console.log("Fetching documents for customer:", selectedCustomer._id);
+
       try {
-        const res = await axios.get(
+        // First, try to get documents directly linked to customer
+        const customerDocsRes = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/document/customer/${
             selectedCustomer._id
           }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setCustomerDocuments(res.data.data || []);
+
+        console.log("Customer documents API response:", customerDocsRes.data);
+        let allDocuments = customerDocsRes.data.data || [];
+
+        // Also try to get documents through applications
+        const customerApps = applications.filter(
+          (app) => app.customer && app.customer._id === selectedCustomer._id
+        );
+
+        console.log("Customer applications found:", customerApps.length);
+
+        // For each application, fetch its documents
+        for (const app of customerApps) {
+          try {
+            const appDocsRes = await axios.get(
+              `${import.meta.env.VITE_BASE_URL}/api/document/application/${
+                app._id
+              }`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            console.log(
+              `Application ${app._id} documents:`,
+              appDocsRes.data.data?.length || 0
+            );
+            if (appDocsRes.data.data) {
+              allDocuments = [...allDocuments, ...appDocsRes.data.data];
+            }
+          } catch (appErr) {
+            console.warn(
+              `Failed to fetch documents for application ${app._id}:`,
+              appErr
+            );
+          }
+        }
+
+        // Remove duplicates by _id
+        const uniqueDocuments = allDocuments.filter(
+          (doc, index, self) =>
+            index === self.findIndex((d) => d._id === doc._id)
+        );
+
+        console.log("Total unique documents found:", uniqueDocuments.length);
+        setCustomerDocuments(uniqueDocuments);
       } catch (err) {
+        console.error("Error fetching documents:", err);
+        console.error("Error response:", err.response?.data);
         toast({
           title: "Error",
           description: "Failed to load documents.",
@@ -133,7 +183,7 @@ export const DirectoryPage: React.FC = () => {
       }
     };
     fetchDocs();
-  }, [selectedCustomer, token, toast]);
+  }, [selectedCustomer, token, toast, applications]);
 
   // When a customer is selected, find their application and set notes
   React.useEffect(() => {
@@ -159,8 +209,15 @@ export const DirectoryPage: React.FC = () => {
 
   const filteredDocuments = customerDocuments.filter((doc) => {
     const matchesSearch =
-      doc.documentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.documentName.toLowerCase().includes(searchTerm.toLowerCase());
+      doc.documentType
+        .toLowerCase()
+        .includes(documentSearchTerm.toLowerCase()) ||
+      doc.documentName
+        .toLowerCase()
+        .includes(documentSearchTerm.toLowerCase()) ||
+      (selectedCustomer?.firstName + " " + selectedCustomer?.lastName)
+        .toLowerCase()
+        .includes(documentSearchTerm.toLowerCase());
     const matchesCategory =
       selectedCategory === "all" || doc.documentType === selectedCategory;
     const matchesStatus =
@@ -292,7 +349,7 @@ export const DirectoryPage: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Search customers...1"
+                    placeholder="Search customers..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -379,33 +436,80 @@ export const DirectoryPage: React.FC = () => {
         <div className="flex-1">
           {selectedCustomer ? (
             <>
-              {/* Filters */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <Select
-                      value={selectedCategory}
-                      onValueChange={setSelectedCategory}
-                    >
-                      <SelectTrigger className="w-full md:w-48">
-                        <SelectValue placeholder="Category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        <SelectItem value="passport">Passport</SelectItem>
-                        <SelectItem value="photo">Photo</SelectItem>
-                        <SelectItem value="visa">Visa</SelectItem>
-                        <SelectItem value="invoice">Invoice</SelectItem>
-                        <SelectItem value="government">Government</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+              {/* Header with customer info and filters */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      {selectedCustomer.firstName} {selectedCustomer.lastName}{" "}
+                      Documents
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                      {filteredDocuments.length} document
+                      {filteredDocuments.length !== 1 ? "s" : ""} found
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Search and Filters */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                      {/* Search documents */}
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Input
+                          placeholder="Search by customer name, application ID, or filename..."
+                          value={documentSearchTerm}
+                          onChange={(e) =>
+                            setDocumentSearchTerm(e.target.value)
+                          }
+                          className="pl-10"
+                        />
+                      </div>
+
+                      {/* Category filter */}
+                      <Select
+                        value={selectedCategory}
+                        onValueChange={setSelectedCategory}
+                      >
+                        <SelectTrigger className="w-full md:w-48">
+                          <SelectValue placeholder="All Categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          <SelectItem value="passport">Passport</SelectItem>
+                          <SelectItem value="photo">Photo</SelectItem>
+                          <SelectItem value="visa">Visa</SelectItem>
+                          <SelectItem value="invoice">Invoice</SelectItem>
+                          <SelectItem value="government">Government</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {/* Status filter */}
+                      <Select
+                        value={selectedStatus}
+                        onValueChange={setSelectedStatus}
+                      >
+                        <SelectTrigger className="w-full md:w-48">
+                          <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="Approved">Approved</SelectItem>
+                          <SelectItem value="Rejected">Rejected</SelectItem>
+                          <SelectItem value="Uploaded">Uploaded</SelectItem>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Documents Grid */}
-              <div className="grid gap-4 mt-4">
+              <div className="space-y-4 mt-4">
                 {loadingDocs ? (
                   <Card>
                     <CardContent className="p-12 text-center">
@@ -432,98 +536,126 @@ export const DirectoryPage: React.FC = () => {
                   filteredDocuments.map((doc) => (
                     <Card
                       key={doc._id}
-                      className="hover:shadow-md transition-shadow"
+                      className="hover:shadow-md transition-shadow border border-gray-200"
                     >
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-gray-900">
-                                {doc.documentType}
+                            {/* File name as main title */}
+                            <div className="flex items-center gap-3 mb-3">
+                              <h3 className="font-semibold text-lg text-gray-900">
+                                {doc.documentName}
                               </h3>
                               <Badge
+                                variant="secondary"
                                 className={getCategoryColor(doc.documentType)}
                               >
                                 {doc.documentType}
                               </Badge>
-                              <Badge className={getStatusColor(doc.status)}>
-                                {doc.status}
+                              <Badge
+                                variant={
+                                  doc.status === "Approved"
+                                    ? "default"
+                                    : doc.status === "Rejected"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                                className={`${
+                                  doc.status === "Approved"
+                                    ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                    : doc.status === "Rejected"
+                                    ? "bg-red-100 text-red-800 hover:bg-red-100"
+                                    : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
+                                }`}
+                              >
+                                {doc.status.toLowerCase()}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                              <span>
-                                <strong>Customer:</strong>{" "}
+
+                            {/* Document details */}
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <div>
+                                <span className="font-medium">Customer:</span>{" "}
                                 {selectedCustomer?.firstName}{" "}
                                 {selectedCustomer?.lastName}
-                              </span>
-                              <span>
-                                <strong>App ID:</strong> {doc.documentName}
-                              </span>
+                              </div>
+                              <div>
+                                <span className="font-medium">App ID:</span>{" "}
+                                {doc.documentName}
+                              </div>
+                              <div>
+                                <span className="font-medium">Uploaded:</span>{" "}
+                                {new Date(doc.uploadedAt).toLocaleDateString()}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 ml-4">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => window.open(doc.fileUrl, "_blank")}
+                              className="flex items-center gap-1"
                             >
-                              <Eye className="w-4 h-4 mr-1" />
+                              <Eye className="w-4 h-4" />
                               View
                             </Button>
+                          </div>
+                        </div>
+
+                        {/* Add note section - shown when adding */}
+                        {addingNoteDocId === doc._id && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex flex-col gap-3">
+                              <textarea
+                                className="w-full border border-gray-300 rounded-md p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Enter note..."
+                                value={newNote}
+                                onChange={(e) => setNewNote(e.target.value)}
+                                rows={3}
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddNote(doc._id)}
+                                  disabled={
+                                    actionLoading === doc._id + "note" ||
+                                    !newNote.trim()
+                                  }
+                                >
+                                  {actionLoading === doc._id + "note"
+                                    ? "Adding..."
+                                    : "Add Note"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setAddingNoteDocId(null);
+                                    setNewNote("");
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Add note button - shown when not adding */}
+                        {addingNoteDocId !== doc._id && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {}}
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              Download
-                            </Button>
-                            <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               onClick={() => setAddingNoteDocId(doc._id)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
                               Add Note
                             </Button>
-                            {addingNoteDocId === doc._id && (
-                              <div className="flex flex-col gap-2 mt-2">
-                                <textarea
-                                  className="border rounded p-1 text-xs"
-                                  placeholder="Enter note..."
-                                  value={newNote}
-                                  onChange={(e) => setNewNote(e.target.value)}
-                                  rows={2}
-                                  style={{ minWidth: 180 }}
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => handleAddNote(doc._id)}
-                                    disabled={
-                                      actionLoading === doc._id + "note" ||
-                                      !newNote.trim()
-                                    }
-                                  >
-                                    {actionLoading === doc._id + "note"
-                                      ? "Adding..."
-                                      : "Add Note"}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setAddingNoteDocId(null);
-                                      setNewNote("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
                           </div>
-                        </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))
