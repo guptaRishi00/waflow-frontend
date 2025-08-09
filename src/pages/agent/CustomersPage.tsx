@@ -27,6 +27,7 @@ import {
   Plus,
   Eye,
   EyeOff,
+  Download,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -1059,8 +1060,7 @@ export const CustomersPage: React.FC = () => {
                     )}
                     {selectedCustomer.lastName && (
                       <div>
-                        <strong>Last Name:</strong>{" "}
-                        {selectedCustomer.lastName}
+                        <strong>Last Name:</strong> {selectedCustomer.lastName}
                       </div>
                     )}
                     {selectedCustomer.dob && (
@@ -1088,8 +1088,7 @@ export const CustomersPage: React.FC = () => {
                     )}
                     {selectedCustomer.gender && (
                       <div>
-                        <strong>Gender:</strong>{" "}
-                        {selectedCustomer.gender}
+                        <strong>Gender:</strong> {selectedCustomer.gender}
                       </div>
                     )}
                     {selectedCustomer.emiratesIdNumber && (
@@ -1121,10 +1120,14 @@ export const CustomersPage: React.FC = () => {
                             <div>State: {selectedCustomer.address.state}</div>
                           )}
                           {selectedCustomer.address.country && (
-                            <div>Country: {selectedCustomer.address.country}</div>
+                            <div>
+                              Country: {selectedCustomer.address.country}
+                            </div>
                           )}
                           {selectedCustomer.address.zipcode && (
-                            <div>Zipcode: {selectedCustomer.address.zipcode}</div>
+                            <div>
+                              Zipcode: {selectedCustomer.address.zipcode}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1132,7 +1135,9 @@ export const CustomersPage: React.FC = () => {
                     {selectedCustomer.createdAt && (
                       <div>
                         <strong>Created At:</strong>{" "}
-                        {new Date(selectedCustomer.createdAt).toLocaleDateString()}
+                        {new Date(
+                          selectedCustomer.createdAt
+                        ).toLocaleDateString()}
                       </div>
                     )}
                   </div>
@@ -1152,149 +1157,160 @@ export const CustomersPage: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* Debug info */}
-                    <div className="text-xs text-gray-500 mb-2">
-                      Total documents: {customerDocuments.length}
-                      {customerDocuments.length > 0 && (
-                        <div>
-                          Document types:{" "}
-                          {customerDocuments
-                            .map((doc) => doc.documentType)
-                            .join(", ")}
+                    {customerDocuments.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">
+                          No documents uploaded yet
+                        </p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Documents uploaded by the customer will appear here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Document count summary */}
+                        <div className="text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
+                          Total documents: {customerDocuments.length}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Local Proof */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Local Proof
-                      </h4>
-                      {(() => {
-                        const localProofDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "local-proof"
-                        );
-                        return localProofDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-blue-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {localProofDoc.documentName || "Local Proof"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    localProofDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
+                        {/* All customer documents */}
+                        {customerDocuments.map((doc, index) => {
+                          // Get document type display name and icon color
+                          const getDocumentTypeDisplay = (type: string) => {
+                            const typeMap: {
+                              [key: string]: { label: string; color: string };
+                            } = {
+                              "local-proof": {
+                                label: "Local Proof",
+                                color: "text-blue-600",
+                              },
+                              "passport-photo": {
+                                label: "Passport Photo",
+                                color: "text-green-600",
+                              },
+                              "bank-statement": {
+                                label: "Bank Statement",
+                                color: "text-purple-600",
+                              },
+                              passport: {
+                                label: "Passport",
+                                color: "text-red-600",
+                              },
+                              visa: { label: "Visa", color: "text-orange-600" },
+                              "emirates-id": {
+                                label: "Emirates ID",
+                                color: "text-indigo-600",
+                              },
+                              "salary-certificate": {
+                                label: "Salary Certificate",
+                                color: "text-yellow-600",
+                              },
+                              noc: { label: "NOC", color: "text-pink-600" },
+                              other: {
+                                label: "Other Document",
+                                color: "text-gray-600",
+                              },
+                            };
+                            return (
+                              typeMap[type] || {
+                                label:
+                                  type.charAt(0).toUpperCase() + type.slice(1),
+                                color: "text-gray-600",
+                              }
+                            );
+                          };
+
+                          const docType = getDocumentTypeDisplay(
+                            doc.documentType
+                          );
+                          const uploadDate = doc.createdAt || doc.uploadedAt;
+
+                          return (
+                            <div
+                              key={doc._id || index}
+                              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText
+                                  className={`w-5 h-5 ${docType.color}`}
+                                />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {doc.documentName || docType.label}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-gray-500">
+                                      {docType.label}
+                                    </span>
+                                    {uploadDate && (
+                                      <>
+                                        <span className="text-xs text-gray-400">
+                                          •
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          {new Date(
+                                            uploadDate
+                                          ).toLocaleDateString()}
+                                        </span>
+                                      </>
+                                    )}
+                                    {doc.status && (
+                                      <>
+                                        <span className="text-xs text-gray-400">
+                                          •
+                                        </span>
+                                        <Badge
+                                          variant={
+                                            doc.status === "verified"
+                                              ? "default"
+                                              : "secondary"
+                                          }
+                                          className="text-xs px-2 py-0"
+                                        >
+                                          {doc.status}
+                                        </Badge>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {doc.fileUrl && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      window.open(doc.fileUrl, "_blank")
+                                    }
+                                    className="h-8"
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    View
+                                  </Button>
+                                )}
+                                {doc.fileUrl && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const link = document.createElement("a");
+                                      link.href = doc.fileUrl;
+                                      link.download =
+                                        doc.documentName || "document";
+                                      link.click();
+                                    }}
+                                    className="h-8"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(localProofDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No local proof uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Passport Photo */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Passport Photo
-                      </h4>
-                      {(() => {
-                        const passportPhotoDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "passport-photo"
-                        );
-                        return passportPhotoDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-green-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {passportPhotoDoc.documentName ||
-                                    "Passport Photo"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    passportPhotoDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(passportPhotoDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No passport photo uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Bank Statement */}
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">
-                        Bank Statement
-                      </h4>
-                      {(() => {
-                        const bankStatementDoc = customerDocuments.find(
-                          (doc) => doc.documentType === "bank-statement"
-                        );
-                        return bankStatementDoc ? (
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-purple-600" />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {bankStatementDoc.documentName ||
-                                    "Bank Statement"}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(
-                                    bankStatementDoc.createdAt
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(bankStatementDoc.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 rounded-lg border text-gray-500 text-sm">
-                            No bank statement uploaded
-                          </div>
-                        );
-                      })()}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

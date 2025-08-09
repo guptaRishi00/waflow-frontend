@@ -892,11 +892,8 @@ export const ManagerCustomersPage: React.FC = () => {
     }
   }, [selectedCustomer, isEditModalOpen]);
 
-  // Filter customers based on search and filters, exclude inactive users
+  // Filter customers based on search and filters, include both active and inactive users
   const filteredCustomers = customers.filter((customer) => {
-    // Exclude customers with inactive status
-    if (getCustomerStatus(customer) === "inactive") return false;
-
     // Apply status filter
     if (statusFilter !== "all") {
       const customerStatus = getCustomerStatus(customer);
@@ -928,11 +925,18 @@ export const ManagerCustomersPage: React.FC = () => {
     );
   });
 
+  // Sort customers by creation date (newest first)
+  const sortedCustomers = filteredCustomers.sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedCustomers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+  const paginatedCustomers = sortedCustomers.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -1731,7 +1735,7 @@ export const ManagerCustomersPage: React.FC = () => {
             </div>
           )}
 
-          {!error && customers.length > 0 && filteredCustomers.length === 0 && (
+          {!error && customers.length > 0 && sortedCustomers.length === 0 && (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
                 <p className="text-muted-foreground">
@@ -1741,7 +1745,7 @@ export const ManagerCustomersPage: React.FC = () => {
             </div>
           )}
 
-          {!error && filteredCustomers.length > 0 && (
+          {!error && sortedCustomers.length > 0 && (
             <>
               <div className="overflow-x-auto border rounded-lg">
                 <Table>
@@ -1956,8 +1960,8 @@ export const ManagerCustomersPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 gap-4 mt-4">
                   <div className="text-sm text-muted-foreground text-center sm:text-left">
                     Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, filteredCustomers.length)} of{" "}
-                    {filteredCustomers.length} results
+                    {Math.min(endIndex, sortedCustomers.length)} of{" "}
+                    {sortedCustomers.length} results
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
