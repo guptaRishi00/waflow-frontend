@@ -125,7 +125,13 @@ export const AgentsPage: React.FC = () => {
   //     agent.email.toLowerCase().includes(searchTerm.toLowerCase())
   // );
 
-  const handleCreateAgent = async () => {
+  const handleCreateAgent = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+
+    // Prevent double submission
+    if (isLoading) return;
     // Validate form
     const errors: { [key: string]: string } = {};
 
@@ -532,7 +538,7 @@ export const AgentsPage: React.FC = () => {
                 credentials will be sent via email.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <form onSubmit={handleCreateAgent} className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name *</Label>
                 <Input
@@ -706,21 +712,24 @@ export const AgentsPage: React.FC = () => {
                   </span>
                 )}
               </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsCreateModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateAgent}
-                className="bg-primary hover:bg-primary/90"
-              >
-                Create Agent
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-primary hover:bg-primary/90"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Creating..." : "Create Agent"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

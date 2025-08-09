@@ -98,6 +98,7 @@ export const ApplicationDetailsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("workflow");
   const [editingField, setEditingField] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
   const { toast } = useToast();
 
   const [applicationData, setApplicationData] = useState<any>(null);
@@ -126,10 +127,37 @@ export const ApplicationDetailsPage: React.FC = () => {
     }
   };
 
+  // Function to fetch application documents
+  const fetchApplicationDocuments = async () => {
+    if (!applicationData?._id || !token) return;
+
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/document/application/${
+          applicationData._id
+        }`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log("Fetched application documents:", response.data.data);
+      setApplicationDocuments(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching application documents:", error);
+    }
+  };
+
   // Fetch application by ID
   useEffect(() => {
     fetchApplication();
   }, [id, token]);
+
+  // Fetch documents after application data is loaded
+  useEffect(() => {
+    if (applicationData?._id) {
+      fetchApplicationDocuments();
+    }
+  }, [applicationData?._id, token]);
 
   // Update applicationDetails when API data is fetched
   useEffect(() => {
@@ -234,19 +262,34 @@ export const ApplicationDetailsPage: React.FC = () => {
         }
       };
 
-      const steps = applicationData.steps.map((step, index) => ({
-        id: step._id || `step-${index}`,
-        title: step.stepName,
-        icon: getStepIcon(step.stepName),
-        status: mapStatus(step.status) as WorkflowStep["status"],
-        internalNotes: "",
-        customerNotes: "",
-        documents: [],
-      }));
+      const steps = applicationData.steps.map((step, index) => {
+        // Find documents related to this step
+        const stepDocuments = applicationDocuments
+          .filter((doc) => doc.relatedStepName === step.stepName)
+          .map((doc) => ({
+            name: doc.documentName,
+            documentName: doc.documentName,
+            documentType: doc.documentType,
+            status: doc.status,
+            url: doc.fileUrl,
+            _id: doc._id,
+            uploadedAt: doc.uploadedAt,
+          }));
+
+        return {
+          id: step._id || `step-${index}`,
+          title: step.stepName,
+          icon: getStepIcon(step.stepName),
+          status: mapStatus(step.status) as WorkflowStep["status"],
+          internalNotes: "",
+          customerNotes: "",
+          documents: stepDocuments,
+        };
+      });
 
       setWorkflowSteps(steps);
     }
-  }, [applicationData]);
+  }, [applicationData, applicationDocuments]);
 
   // Application details state - will be populated from API data
   const [applicationDetails, setApplicationDetails] = useState({
@@ -320,6 +363,9 @@ export const ApplicationDetailsPage: React.FC = () => {
       formData.append("relatedStepName", stepName);
       formData.append("linkedModel", "Application");
       formData.append("applicationId", applicationData?._id || "");
+      formData.append("linkedTo", applicationData?._id || "");
+      formData.append("userId", user?._id || user?.id || "");
+      formData.append("uploadedBy", user?._id || user?.id || "");
 
       console.log("Sending formData with:");
       console.log("- file:", file.name, file.size, file.type);
@@ -328,6 +374,9 @@ export const ApplicationDetailsPage: React.FC = () => {
       console.log("- relatedStepName:", stepName);
       console.log("- linkedModel: Application");
       console.log("- applicationId:", applicationData?._id);
+      console.log("- linkedTo:", applicationData?._id);
+      console.log("- userId:", user?._id || user?.id);
+      console.log("- uploadedBy:", user?._id || user?.id);
 
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
@@ -345,10 +394,8 @@ export const ApplicationDetailsPage: React.FC = () => {
         description: "Document has been uploaded successfully",
       });
 
-      // Refresh application data to show new document
-      if (id) {
-        fetchApplication();
-      }
+      // Refresh documents data to show new document
+      await fetchApplicationDocuments();
     } catch (error: any) {
       console.error("Error uploading document:", error);
       console.error("Error response:", error.response?.data);
@@ -521,34 +568,141 @@ export const ApplicationDetailsPage: React.FC = () => {
               <>
                 {/* Document Upload */}
                 <div className="space-y-3">
-                  <h4 className="font-medium">Documents</h4>
-                  <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center">
-                    <Upload className="h-8 w-8 mx-auto text-blue-400 mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Upload documents for this step
-                    </p>
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="file"
-                        onChange={(e) => handleFileInputChange(e, step.title)}
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        disabled={isUploading}
-                        id={`file-input-${step.id}`}
-                      />
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Documents
+                    </h4>
+                    {isUploading && (
+                      <Badge variant="secondary" className="text-xs">
+                        Uploading...
+                      </Badge>
+                    )}
                   </div>
 
-                  {/* Uploaded documents */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4" />
-                        <span className="text-sm">Passport Copy.pdf</span>
+                  {/* Check if there are existing documents that are not rejected */}
+                  {(() => {
+                    const hasNonRejectedDocument =
+                      step.documents &&
+                      step.documents.length > 0 &&
+                      step.documents.some(
+                        (doc) =>
+                          doc.status !== "Rejected" && doc.status !== "rejected"
+                      );
+
+                    if (hasNonRejectedDocument) {
+                      return (
+                        <div className="border-2 border-dashed border-orange-300 bg-orange-50 rounded-lg p-6 text-center">
+                          <Upload className="h-10 w-10 mx-auto mb-3 text-orange-500" />
+                          <p className="text-sm font-medium text-orange-700 mb-1">
+                            Document already uploaded
+                          </p>
+                          <p className="text-xs text-orange-600">
+                            A document for this step already exists. You can
+                            only upload a new document if the existing one is
+                            rejected.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                          isUploading
+                            ? "border-gray-300 bg-gray-50"
+                            : "border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
+                        }`}
+                      >
+                        <Upload
+                          className={`h-10 w-10 mx-auto mb-3 ${
+                            isUploading ? "text-gray-400" : "text-blue-500"
+                          }`}
+                        />
+                        <p className="text-sm font-medium text-gray-700 mb-1">
+                          {isUploading
+                            ? "Uploading document..."
+                            : "Upload documents for this step"}
+                        </p>
+                        <p className="text-xs text-gray-500 mb-4">
+                          Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max
+                          10MB)
+                        </p>
+                        <div className="flex items-center justify-center">
+                          <label
+                            htmlFor={`file-input-${step.id}`}
+                            className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors ${
+                              isUploading
+                                ? "bg-gray-400 cursor-not-allowed"
+                                : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            }`}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {isUploading ? "Uploading..." : "Choose File"}
+                          </label>
+                          <input
+                            type="file"
+                            onChange={(e) =>
+                              handleFileInputChange(e, step.title)
+                            }
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            className="hidden"
+                            disabled={isUploading}
+                            id={`file-input-${step.id}`}
+                          />
+                        </div>
                       </div>
-                      <Badge variant="default">Verified</Badge>
+                    );
+                  })()}
+
+                  {/* Uploaded documents */}
+                  {step.documents && step.documents.length > 0 && (
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-medium text-gray-700">
+                        Uploaded Documents:
+                      </h5>
+                      {step.documents.map((document, docIndex) => (
+                        <div
+                          key={docIndex}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                {document.name ||
+                                  document.documentName ||
+                                  "Document"}
+                              </span>
+                              {document.documentType && (
+                                <span className="text-xs text-gray-500">
+                                  {document.documentType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="default" className="text-xs">
+                              {document.status || "Uploaded"}
+                            </Badge>
+                            {document.url && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  window.open(document.url, "_blank")
+                                }
+                                className="h-7 px-2"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -1551,24 +1705,58 @@ export const ApplicationDetailsPage: React.FC = () => {
                       </AccordionTrigger>
                       <AccordionContent className="space-y-2 text-sm">
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between p-2 border rounded">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              <span>Passport Copy.pdf</span>
+                          {applicationDocuments.length > 0 ? (
+                            applicationDocuments.map((document, index) => (
+                              <div
+                                key={document._id || index}
+                                className="flex items-center justify-between p-2 border rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4" />
+                                  <div className="flex flex-col">
+                                    <span>{document.documentName}</span>
+                                    {document.relatedStepName && (
+                                      <span className="text-xs text-gray-500">
+                                        {document.relatedStepName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      document.status === "Uploaded" ||
+                                      document.status === "Approved"
+                                        ? "default"
+                                        : document.status === "Rejected"
+                                        ? "destructive"
+                                        : "secondary"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {document.status || "Uploaded"}
+                                  </Badge>
+                                  {document.fileUrl && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        window.open(document.fileUrl, "_blank")
+                                      }
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-gray-500 text-center py-4">
+                              No documents uploaded yet
                             </div>
-                            <Badge variant="default" className="text-xs">
-                              Verified
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between p-2 border rounded">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              <span>Emirates ID.pdf</span>
-                            </div>
-                            <Badge variant="secondary" className="text-xs">
-                              Pending
-                            </Badge>
-                          </div>
+                          )}
                         </div>
                       </AccordionContent>
                     </AccordionItem>

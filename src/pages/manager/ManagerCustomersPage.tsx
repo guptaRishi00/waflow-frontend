@@ -70,6 +70,7 @@ import {
   Loader2,
   MessageSquare,
   Shield,
+  Building,
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
@@ -184,6 +185,11 @@ export const ManagerCustomersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [nationalityFilter, setNationalityFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
+
   const { token } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
 
@@ -207,7 +213,7 @@ export const ManagerCustomersPage: React.FC = () => {
   >([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [agents, setAgents] = useState<
-    Array<{ _id: string; fullName: string; email: string }>
+    Array<{ _id: string; fullName: string; email: string; status: string }>
   >([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
 
@@ -410,17 +416,11 @@ export const ManagerCustomersPage: React.FC = () => {
     fetchAgents();
   }, [token]);
 
-  // Calculate summary statistics
-  const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(
-    (customer) =>
-      customer.status === "active" ||
-      (customer.assignedAgentId && customer.assignedAgentId !== null)
-  ).length;
-  const pendingAssignment = customers.filter(
-    (customer) => !customer.assignedAgentId || customer.assignedAgentId === null
-  ).length;
-  const totalApplications = applications.length;
+  // Get customer status
+  const getCustomerStatus = (customer: Customer) => {
+    if (customer.status) return customer.status;
+    return customer.assignedAgentId ? "active" : "pending";
+  };
 
   // Get customer applications count
   const getCustomerApplicationsCount = (customerId: string) => {
@@ -435,11 +435,15 @@ export const ManagerCustomersPage: React.FC = () => {
     }).length;
   };
 
-  // Get customer status
-  const getCustomerStatus = (customer: Customer) => {
-    if (customer.status) return customer.status;
-    return customer.assignedAgentId ? "active" : "pending";
-  };
+  // Calculate summary statistics
+  const totalCustomers = customers.length;
+  const activeCustomers = customers.filter(
+    (customer) => getCustomerStatus(customer) === "active"
+  ).length;
+  const pendingAssignment = customers.filter(
+    (customer) => !customer.assignedAgentId || customer.assignedAgentId === null
+  ).length;
+  const totalApplications = applications.length;
 
   // Get customer name
   const getCustomerName = (customer: Customer) => {
@@ -888,15 +892,41 @@ export const ManagerCustomersPage: React.FC = () => {
     }
   }, [selectedCustomer, isEditModalOpen]);
 
-  // Filter customers based on search
-  const filteredCustomers = customers.filter(
-    (customer) =>
+  // Filter customers based on search and filters, exclude inactive users
+  const filteredCustomers = customers.filter((customer) => {
+    // Exclude customers with inactive status
+    if (getCustomerStatus(customer) === "inactive") return false;
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      const customerStatus = getCustomerStatus(customer);
+      if (statusFilter !== customerStatus) return false;
+    }
+
+    // Apply nationality filter
+    if (nationalityFilter !== "all") {
+      if (!customer.nationality || customer.nationality !== nationalityFilter)
+        return false;
+    }
+
+    // Apply agent filter
+    if (agentFilter !== "all") {
+      if (agentFilter === "unassigned") {
+        if (customer.assignedAgentId) return false;
+      } else {
+        if (customer.assignedAgentId !== agentFilter) return false;
+      }
+    }
+
+    // Apply search filter
+    return (
       getCustomerName(customer)
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.customerId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    );
+  });
 
   // Pagination logic
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
@@ -945,26 +975,39 @@ export const ManagerCustomersPage: React.FC = () => {
 
       setCustomerDetails(customerData);
 
-      // Fetch customer applications
+      // Fetch customer applications using specific customer API endpoint
       try {
+        console.log("Fetching applications for customer ID:", customerId);
         const applicationsResponse = await axios.get(
           `${import.meta.env.VITE_BASE_URL}/api/application/app/${customerId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Applications response:", applicationsResponse.data);
+        console.log(
+          "Customer applications response:",
+          applicationsResponse.data
+        );
 
-        // Handle the response - it could be a single application or an array
+        // Handle different response structures
         let applicationsData = [];
-        if (applicationsResponse.data.data) {
-          // If it's a single application object, wrap it in an array
-          if (Array.isArray(applicationsResponse.data.data)) {
-            applicationsData = applicationsResponse.data.data;
-          } else {
+        if (
+          applicationsResponse.data.success &&
+          applicationsResponse.data.data
+        ) {
+          // If data is a single application object, wrap it in an array
+          if (applicationsResponse.data.data._id) {
             applicationsData = [applicationsResponse.data.data];
+          } else if (Array.isArray(applicationsResponse.data.data)) {
+            applicationsData = applicationsResponse.data.data;
           }
+        } else if (Array.isArray(applicationsResponse.data)) {
+          applicationsData = applicationsResponse.data;
         }
 
-        console.log("Processed applications data:", applicationsData);
+        console.log(
+          "Applications found for customer:",
+          applicationsData.length
+        );
+        console.log("Customer applications data:", applicationsData);
         setCustomerApplications(applicationsData);
       } catch (applicationError) {
         console.log(
@@ -976,6 +1019,7 @@ export const ManagerCustomersPage: React.FC = () => {
           setCustomerApplications([]);
         } else {
           console.error("Error fetching applications:", applicationError);
+          setCustomerApplications([]);
         }
       }
 
@@ -998,10 +1042,39 @@ export const ManagerCustomersPage: React.FC = () => {
     setSelectedCustomerId(null);
   };
 
-  // Reset to first page when search term changes
+  // Reset to first page when search term or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter, nationalityFilter, agentFilter]);
+
+  // Get unique nationalities for filter
+  const getUniqueNationalities = () => {
+    const nationalities = customers
+      .filter((customer) => customer.nationality)
+      .map((customer) => customer.nationality)
+      .filter(
+        (nationality, index, array) => array.indexOf(nationality) === index
+      )
+      .sort();
+    return nationalities;
+  };
+
+  // Reset filters function
+  const resetFilters = () => {
+    setStatusFilter("all");
+    setNationalityFilter("all");
+    setAgentFilter("all");
+    setSearchTerm("");
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = () => {
+    return (
+      statusFilter !== "all" ||
+      nationalityFilter !== "all" ||
+      agentFilter !== "all"
+    );
+  };
 
   if (loading) {
     return <PageLoader message="Loading customers..." size="lg" />;
@@ -1161,11 +1234,13 @@ export const ManagerCustomersPage: React.FC = () => {
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {agents.map((agent) => (
-                        <SelectItem key={agent._id} value={agent._id}>
-                          {agent.fullName} ({agent.email})
-                        </SelectItem>
-                      ))}
+                      {agents
+                        .filter((agent) => agent.status === "active")
+                        .map((agent) => (
+                          <SelectItem key={agent._id} value={agent._id}>
+                            {agent.fullName} ({agent.email})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {createFormErrors.assignedAgentId && (
@@ -1508,10 +1583,105 @@ export const ManagerCustomersPage: React.FC = () => {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={hasActiveFilters() ? "default" : "outline"}
+                    size="sm"
+                    className={
+                      hasActiveFilters()
+                        ? "bg-primary text-primary-foreground"
+                        : ""
+                    }
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filter{" "}
+                    {hasActiveFilters() &&
+                      `(${
+                        [
+                          statusFilter !== "all",
+                          nationalityFilter !== "all",
+                          agentFilter !== "all",
+                        ].filter(Boolean).length
+                      })`}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="p-3 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Status
+                      </label>
+                      <Select
+                        value={statusFilter}
+                        onValueChange={setStatusFilter}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Nationality
+                      </label>
+                      <Select
+                        value={nationalityFilter}
+                        onValueChange={setNationalityFilter}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Nationalities</SelectItem>
+                          {getUniqueNationalities().map((nationality) => (
+                            <SelectItem key={nationality} value={nationality!}>
+                              {nationality}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Agent Assignment
+                      </label>
+                      <Select
+                        value={agentFilter}
+                        onValueChange={setAgentFilter}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Assignments</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {agents
+                            .filter((agent) => agent.status === "active")
+                            .map((agent) => (
+                              <SelectItem key={agent._id} value={agent._id}>
+                                {agent.fullName}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="w-full text-xs"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline">
@@ -2499,7 +2669,10 @@ export const ManagerCustomersPage: React.FC = () => {
                           <FileText className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <p className="text-base font-medium">
-                              {customerApplications.length} Application(s)
+                              {Array.isArray(customerApplications)
+                                ? customerApplications.length
+                                : 0}{" "}
+                              Application(s)
                             </p>
                             <p className="text-sm text-muted-foreground">
                               Total Applications
@@ -2510,11 +2683,11 @@ export const ManagerCustomersPage: React.FC = () => {
                           <Activity className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <p className="text-base font-medium">
-                              {
-                                customerApplications.filter(
-                                  (app) => app.status === "active"
-                                ).length
-                              }{" "}
+                              {Array.isArray(customerApplications)
+                                ? customerApplications.filter(
+                                    (app) => app.status === "active"
+                                  ).length
+                                : 0}{" "}
                               Active
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -2563,24 +2736,29 @@ export const ManagerCustomersPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>
-                          Applications ({customerApplications.length})
+                          Applications (
+                          {Array.isArray(customerApplications)
+                            ? customerApplications.length
+                            : 0}
+                          )
                         </CardTitle>
                         <CardDescription>
                           All applications for this customer
                         </CardDescription>
                       </div>
                       <Badge variant="secondary">
-                        {
-                          customerApplications.filter(
-                            (app) => app.status === "active"
-                          ).length
-                        }{" "}
+                        {Array.isArray(customerApplications)
+                          ? customerApplications.filter(
+                              (app) => app.status === "active"
+                            ).length
+                          : 0}{" "}
                         Active
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {customerApplications.length > 0 ? (
+                    {Array.isArray(customerApplications) &&
+                    customerApplications.length > 0 ? (
                       <div className="space-y-4">
                         {customerApplications.map((application, index) => (
                           <ApplicationAccordion
@@ -2633,12 +2811,6 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
   index,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [uploadForm, setUploadForm] = useState({
-    title: "",
-    file: null as File | null,
-  });
-  const [isUploading, setIsUploading] = useState(false);
   const [isStepActionLoading, setIsStepActionLoading] = useState(false);
   const [agentNotes, setAgentNotes] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -2659,90 +2831,6 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select a file smaller than 10MB",
-          variant: "destructive",
-        });
-        return;
-      }
-      setUploadForm((prev) => ({ ...prev, file }));
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadForm.title || !uploadForm.file || !application) return;
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("title", uploadForm.title);
-      formData.append("file", uploadForm.file);
-      formData.append("applicationId", application._id);
-
-      const response = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      toast({
-        title: "Document uploaded",
-        description: "Document has been uploaded successfully",
-      });
-
-      setIsUploadDialogOpen(false);
-      setUploadForm({ title: "", file: null });
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDownload = async (documentId: string, fileName: string) => {
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/download/${documentId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading document:", error);
-      toast({
-        title: "Download failed",
-        description: "Failed to download document. Please try again.",
-        variant: "destructive",
-      });
-    }
   };
 
   // Step management functions
@@ -2841,362 +2929,294 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
   };
 
   return (
-    <div className="border rounded-lg">
-      <button
+    <Card className="w-full">
+      <CardHeader
+        className="pb-3 cursor-pointer hover:bg-gray-50/50 transition-colors rounded-t-lg"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center gap-4">
-          <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-            {index + 1}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold shadow-sm">
+              {index + 1}
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-lg">
+                Application #
+                {application.applicationNumber || `APP-${index + 1}`}
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {application.businessSetup?.companyType ||
+                  "Business Application"}{" "}
+                • Created {formatDate(application.submissionDate)}
+              </CardDescription>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold">Application {index + 1}</h3>
-            <p className="text-sm text-muted-foreground">
-              ID: {application.applicationNumber}
-            </p>
+          <div className="flex items-center gap-3">
+            {getStatusBadge(application.status)}
+            <Badge variant="outline" className="text-xs">
+              {application.paymentStatus}
+            </Badge>
+            <ChevronDown
+              className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+                isExpanded ? "rotate-180" : ""
+              }`}
+            />
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {getStatusBadge(application.status)}
-          <Badge variant="outline">{application.paymentStatus}</Badge>
-          <ChevronDown
-            className={`h-4 w-4 transition-transform ${
-              isExpanded ? "rotate-180" : ""
-            }`}
-          />
-        </div>
-      </button>
+      </CardHeader>
 
       {isExpanded && (
-        <div className="p-4 border-t bg-gray-50">
+        <CardContent className="pt-0">
           <div className="space-y-6">
-            {/* 1. Application Details */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-sm">1. Application Details</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Application ID:</span>
-                  <span className="font-medium">{application._id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Assigned Agent:</span>
-                  <span>{application.assignedAgent?.fullName || "N/A"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Submission Date:
-                  </span>
-                  <span>{formatDate(application.submissionDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last Updated:</span>
-                  <span>{formatDate(application.lastUpdatedDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Current Status:</span>
-                  <span>{getStatusBadge(application.status)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Company Jurisdiction:
-                  </span>
-                  <span>{application.companyJurisdiction || "N/A"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Business Setup Details */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-sm">
-                2. Business Setup Details
+            {/* Application Overview */}
+            <div className="bg-white rounded-lg border p-4">
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Application Details
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Company Type:</span>
-                  <span>{application.businessSetup?.companyType || "N/A"}</span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Application ID
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).applicationId || application._id}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Status
+                    </span>
+                    <div>{getStatusBadge(application.status)}</div>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Application Type
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).applicationType || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Emirate
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).emirate || "N/A"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Business Activity:
-                  </span>
-                  <span>
-                    {application.businessSetup?.businessActivity || "N/A"}
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Legal Form
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).legalForm || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Total Agreed Cost
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).totalAgreedCost
+                        ? `AED ${(
+                            application as any
+                          ).totalAgreedCost.toLocaleString()}`
+                        : "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Assigned Agent
+                    </span>
+                    <span className="font-medium text-sm">
+                      {application.assignedAgent?.fullName || "Unassigned"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Created Date
+                    </span>
+                    <span className="font-medium text-sm">
+                      {formatDate((application as any).createdAt)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Proposed Name:</span>
-                  <span>
-                    {application.businessSetup?.proposedName || "N/A"}
-                  </span>
+              </div>
+            </div>
+
+            {/* Company Details */}
+            <div className="bg-white rounded-lg border p-4">
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Company Details
+              </h4>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Company Names (EN)
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).proposedCompanyNamesEN?.length > 0
+                        ? (application as any).proposedCompanyNamesEN.join(", ")
+                        : "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Company Name (AR)
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).proposedCompanyNameAR || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Office Required
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).officeRequired ? "Yes" : "No"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Alternative Names:
-                  </span>
-                  <span>
-                    {application.businessSetup?.alternativeNames?.length > 0
-                      ? application.businessSetup.alternativeNames.join(", ")
-                      : "N/A"}
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Office Type
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).officeType || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Business Activities
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).businessActivities?.length > 0
+                        ? (application as any).businessActivities.join(", ")
+                        : "Not specified"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-muted-foreground">
+                      Locked Status
+                    </span>
+                    <span className="font-medium text-sm">
+                      {(application as any).isLocked ? "Locked" : "Unlocked"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Office Type:</span>
-                  <span>{application.businessSetup?.officeType || "N/A"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Quoted Price:</span>
-                  <span>
-                    {application.businessSetup?.quotedPrice
-                      ? `$${application.businessSetup.quotedPrice}`
-                      : "N/A"}
+              </div>
+            </div>
+
+            {/* Shareholder Details */}
+            <div className="bg-white rounded-lg border p-4">
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Shareholder Details
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-muted-foreground">
+                    Nature of Control
+                  </span>
+                  <span className="font-medium text-sm">
+                    {(application as any).shareholderDetails?.natureOfControl
+                      ?.length > 0
+                      ? (
+                          application as any
+                        ).shareholderDetails.natureOfControl.join(", ")
+                      : "Not specified"}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* 3. Investor Details */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-sm">3. Investor Details</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Number of Investors:
-                  </span>
-                  <span>{application.investors?.length || 0}</span>
-                </div>
-              </div>
-              {application.investors && application.investors.length > 0 ? (
-                <div className="space-y-3">
-                  {application.investors.map((investor, idx) => (
-                    <div key={idx} className="p-3 bg-white rounded border">
-                      <h5 className="font-medium text-sm mb-2">
-                        Investor {idx + 1}:
+            {/* Payment Information */}
+            <div className="bg-white rounded-lg border p-4">
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Payment Information
+              </h4>
+              {(application as any).paymentEntries &&
+              (application as any).paymentEntries.length > 0 ? (
+                <div className="space-y-4">
+                  {(application as any).paymentEntries.map((payment, idx) => (
+                    <div
+                      key={payment._id || idx}
+                      className="border rounded-lg p-4 bg-gray-50"
+                    >
+                      <h5 className="font-medium text-sm mb-3">
+                        Payment {idx + 1}
                       </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Name:</span>
-                          <p className="font-medium">
-                            {investor.name || "N/A"}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">
-                            Ownership %:
-                          </span>
-                          <p className="font-medium">
-                            {investor.ownershipPercentage || "N/A"}%
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Role:</span>
-                          <p className="font-medium">
-                            {investor.role || "N/A"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    No investors found
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 4. Payment Details */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-sm">4. Payment Details</h4>
-              {application.payments && application.payments.length > 0 ? (
-                <div className="space-y-3">
-                  {application.payments.map((payment, idx) => (
-                    <div key={idx} className="p-3 bg-white rounded border">
-                      <h5 className="font-medium text-sm mb-2">
-                        Payment {idx + 1}:
-                      </h5>
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Amount:
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-muted-foreground">
+                              Payment Method
                             </span>
-                            <span className="font-medium">
-                              ${payment.amount || "N/A"}
+                            <span className="font-medium text-sm">
+                              {payment.paymentMethod}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Status:
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-muted-foreground">
+                              Amount Paid
+                            </span>
+                            <span className="font-medium text-sm">
+                              AED {payment.amountPaid?.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-muted-foreground">
+                              Payment Status
                             </span>
                             <Badge
-                              variant="outline"
-                              className={
-                                payment.status === "paid"
-                                  ? "bg-green-100 text-green-800"
-                                  : payment.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
+                              variant={
+                                payment.paymentStatus === "Failed"
+                                  ? "destructive"
+                                  : payment.paymentStatus === "Completed"
+                                  ? "default"
+                                  : "secondary"
                               }
+                              className="text-xs"
                             >
-                              {payment.status || "N/A"}
+                              {payment.paymentStatus}
                             </Badge>
                           </div>
                         </div>
-                        {payment.invoiceUrl && (
-                          <Button size="sm" variant="outline">
-                            Download Invoice
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    No payment details found
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 5. Documents */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-sm">5. Documents</h4>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground">
-                  Uploaded Documents:
-                </span>
-                <Dialog
-                  open={isUploadDialogOpen}
-                  onOpenChange={setIsUploadDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload New Document
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Upload Document</DialogTitle>
-                      <DialogDescription>
-                        Upload a new document for this application. Maximum file
-                        size is 10MB.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="title">Document Title</Label>
-                        <Input
-                          id="title"
-                          value={uploadForm.title}
-                          onChange={(e) =>
-                            setUploadForm((prev) => ({
-                              ...prev,
-                              title: e.target.value,
-                            }))
-                          }
-                          placeholder="Enter document title"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="file">Select File</Label>
-                        <Input
-                          id="file"
-                          type="file"
-                          onChange={handleFileChange}
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
-                        </p>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setIsUploadDialogOpen(false);
-                          setUploadForm({ title: "", file: null });
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleUpload}
-                        disabled={
-                          !uploadForm.title || !uploadForm.file || isUploading
-                        }
-                      >
-                        {isUploading ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload
-                          </>
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {application.documents && application.documents.length > 0 ? (
-                <div className="space-y-3">
-                  {application.documents.map((document, idx) => (
-                    <div
-                      key={document._id || idx}
-                      className="p-3 bg-white rounded border"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Document Name:
-                          </span>
-                          <span className="font-medium">
-                            {document.name || "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Uploaded By:
-                          </span>
-                          <span>{document.uploadedBy || "N/A"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Uploaded Date:
-                          </span>
-                          <span>{formatDate(document.uploadedDate)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Actions:
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handleDownload(document._id, document.name)
-                              }
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-muted-foreground">
+                              Payment Date
+                            </span>
+                            <span className="font-medium text-sm">
+                              {formatDate(payment.paymentDate)}
+                            </span>
                           </div>
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-muted-foreground">
+                              Transaction Ref
+                            </span>
+                            <span className="font-medium text-sm">
+                              {payment.transactionRefNo}
+                            </span>
+                          </div>
+                          {payment.additionalNotes && (
+                            <div className="pt-2">
+                              <span className="text-sm text-muted-foreground">
+                                Notes:
+                              </span>
+                              <p className="text-sm font-medium mt-1">
+                                {payment.additionalNotes}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -3204,9 +3224,9 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <Shield className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    No documents uploaded yet
+                    No payment information available
                   </p>
                 </div>
               )}
@@ -3215,7 +3235,7 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
             {/* Application Steps */}
             {application.steps && application.steps.length > 0 && (
               <div className="space-y-4">
-                <h4 className="font-semibold text-sm">6. Application Steps</h4>
+                <h4 className="font-semibold text-sm">5. Application Steps</h4>
                 <div className="space-y-3">
                   {application.steps.map((step, stepIndex) => (
                     <div
@@ -3327,8 +3347,8 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 };
