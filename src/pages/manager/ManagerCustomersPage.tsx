@@ -2861,10 +2861,8 @@ const ApplicationAccordion: React.FC<ApplicationAccordionProps> = ({
     try {
       const step = application.steps[stepIndex];
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
-          typeof application.customer === "string"
-            ? application.customer
-            : application.customer._id
+        `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
+          application._id
         }`,
         {
           stepName: step.stepName,

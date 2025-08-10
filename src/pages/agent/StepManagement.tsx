@@ -79,7 +79,7 @@ const StepManagement = ({
       const response = await axios.patch(
         `${
           import.meta.env.VITE_BASE_URL
-        }/api/application/stepStatus/${customerId}`,
+        }/api/application/step-status/${applicationId}`,
         {
           stepName: currentStep.stepName,
           status: newStatus,

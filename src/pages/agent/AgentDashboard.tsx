@@ -105,8 +105,8 @@ export const AgentDashboard: React.FC = () => {
       }
 
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
-          application.customer._id
+        `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
+          application._id
         }`,
         { stepName, status },
         { headers: { Authorization: `Bearer ${token}` } }

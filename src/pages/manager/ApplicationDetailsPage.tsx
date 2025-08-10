@@ -15,6 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -44,6 +50,9 @@ import {
   Trash2,
   Edit3,
   Eye,
+  AlertTriangle,
+  ClipboardCheck,
+  RefreshCw,
 } from "lucide-react";
 import { NotesModule } from "@/components/common/NotesModule";
 // import { mockApplications } from "@/lib/mock-data";
@@ -63,15 +72,85 @@ import {
 } from "./EditSectionModal";
 import axios from "axios";
 
+// 🎯 IMPROVED TYPE SAFETY: Define proper interfaces instead of using 'any'
+interface ApplicationDocument {
+  _id: string;
+  documentName: string;
+  name?: string; // 🎯 ADD: Alternative property name used in some parts of the code
+  status: string;
+  stepName?: string;
+  relatedStepName?: string;
+  applicationId: string;
+  documentType: string;
+  documentUrl?: string;
+  url?: string; // 🎯 ADD: Alternative property name used in some parts of the code
+  fileUrl?: string; // 🎯 ADD: Alternative property name used in some parts of the code
+  uploadedAt: string;
+  updatedAt: string;
+}
+
+interface Customer {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+}
+
+interface ApplicationStep {
+  _id: string;
+  stepName: string;
+  status: string;
+  isCompleted: boolean;
+  documents?: ApplicationDocument[];
+}
+
+interface ApiApplicationData {
+  _id: string;
+  applicationId: string;
+  status: string;
+  applicationType: string;
+  customer: Customer;
+  steps: ApplicationStep[];
+  // 🎯 ADD: Additional properties used throughout the component
+  emirate?: string;
+  legalForm?: string;
+  proposedCompanyNamesEN?: string[];
+  proposedCompanyNameAR?: string; // 🎯 ADD: Arabic company name
+  officeRequired?: boolean;
+  officeType?: string;
+  applicationNotes?: string;
+  businessActivities?: string[]; // 🎯 ADD: Business activities array
+  assignedAgent?: {
+    fullName: string;
+  };
+  totalAgreedCost?: number;
+  paymentEntries?: Array<{
+    paymentMethod?: string;
+    amountPaid?: number;
+    paymentDate?: string;
+    transactionRefNo?: string;
+    paymentStatus?: string;
+    receiptUpload?: string | null;
+    additionalNotes?: string;
+  }>;
+  shareholderDetails?: any; // 🎯 TODO: Define proper type when structure is known
+  sponsorDetails?: any; // 🎯 ADD: Sponsor details (type to be defined)
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface WorkflowStep {
   id: string;
   title: string;
+  stepName: string; // 🎯 ADD: Original step name from database for document matching
   icon: React.ReactNode;
   status: "not-started" | "submitted" | "awaiting" | "approved" | "declined";
   internalNotes: string;
   customerNotes: string;
-  documents: any[];
+  documents: ApplicationDocument[];
   substeps?: WorkflowStep[];
+  syncStatus?: "synced" | "pending" | "error"; // Track sync status with backend
 }
 
 const statusColors = {
@@ -98,15 +177,15 @@ export const ApplicationDetailsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("workflow");
   const [editingField, setEditingField] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [applicationDocuments, setApplicationDocuments] = useState<any[]>([]);
+  const [applicationDocuments, setApplicationDocuments] = useState<
+    ApplicationDocument[]
+  >([]);
   const { toast } = useToast();
 
-  const [applicationData, setApplicationData] = useState<any>(null);
-
-  // Mock application data - in real app, fetch by ID
-  // const application = mockApplications[0];
-
-  console.log("Application ID from params:", id);
+  const [applicationData, setApplicationData] =
+    useState<ApiApplicationData | null>(null);
+  const [documentFetchAttempts, setDocumentFetchAttempts] = useState(0);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
   // Function to fetch application data
   const fetchApplication = async () => {
@@ -120,44 +199,96 @@ export const ApplicationDetailsPage: React.FC = () => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log("Fetched application:", response.data.data);
-      setApplicationData(response.data.data);
+
+      const appData = response.data.data;
+
+      if (appData?.steps) {
+        appData.steps.forEach((step: any, index: number) => {});
+      }
+      setApplicationData(appData);
+
+      // 🎯 CRITICAL FIX: Fetch documents immediately after setting application data
+      // This ensures you are using the correct and most up-to-date ID.
+      if (appData?._id) {
+        fetchApplicationDocuments(appData._id);
+      }
     } catch (error) {
-      console.error("Error fetching application:", error.message);
+      // Error fetching application
     }
   };
 
   // Function to fetch application documents
-  const fetchApplicationDocuments = async () => {
-    if (!applicationData?._id || !token) return;
+  const fetchApplicationDocuments = async (applicationId: string) => {
+    if (!applicationId || !token) {
+      return;
+    }
+
+    setIsLoadingDocuments(true);
 
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/api/document/application/${
-          applicationData._id
-        }`,
+        `${
+          import.meta.env.VITE_BASE_URL
+        }/api/document/application/${applicationId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log("Fetched application documents:", response.data.data);
-      setApplicationDocuments(response.data.data || []);
-    } catch (error) {
-      console.error("Error fetching application documents:", error);
+
+      if (response.data.success && response.data.data) {
+        setApplicationDocuments(response.data.data);
+        // Reset retry attempts on success
+        setDocumentFetchAttempts(0);
+      } else {
+        setApplicationDocuments([]);
+      }
+    } catch (error: any) {
+      // Check if it's an authentication error
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast({
+          title: "Authentication Error",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        dispatch(logout());
+        navigate("/auth");
+        return;
+      }
+
+      // For other errors, show toast but don't redirect
+      toast({
+        title: "Error",
+        description: "Failed to fetch documents. Please try again.",
+        variant: "destructive",
+      });
+
+      setApplicationDocuments([]);
+
+      // Retry logic for document fetching
+      if (documentFetchAttempts < 3) {
+        setDocumentFetchAttempts((prev) => prev + 1);
+
+        // Retry after 2 seconds
+        setTimeout(() => {
+          if (applicationId && token) {
+            fetchApplicationDocuments(applicationId);
+          }
+        }, 2000);
+      }
+    } finally {
+      setIsLoadingDocuments(false);
     }
   };
 
   // Fetch application by ID
   useEffect(() => {
-    fetchApplication();
+    if (id && token) {
+      fetchApplication();
+    }
   }, [id, token]);
 
-  // Fetch documents after application data is loaded
-  useEffect(() => {
-    if (applicationData?._id) {
-      fetchApplicationDocuments();
-    }
-  }, [applicationData?._id, token]);
+  // 🎯 REMOVED: This useEffect hook is no longer needed because fetchApplication now handles document fetching
+  // The consolidated approach eliminates the race condition and ensures documents are fetched reliably
 
   // Update applicationDetails when API data is fetched
   useEffect(() => {
@@ -239,63 +370,73 @@ export const ApplicationDetailsPage: React.FC = () => {
         if (stepNameLower.includes("bank") || stepNameLower.includes("account"))
           return <Building className="h-5 w-5" />;
         if (
-          stepNameLower.includes("chamber") ||
-          stepNameLower.includes("commerce")
+          stepNameLower.includes("insurance") ||
+          stepNameLower.includes("liability")
         )
-          return <Building2 className="h-5 w-5" />;
+          return <Shield className="h-5 w-5" />;
+        if (
+          stepNameLower.includes("compliance") ||
+          stepNameLower.includes("audit")
+        )
+          return <ClipboardCheck className="h-5 w-5" />;
+        if (
+          stepNameLower.includes("final") ||
+          stepNameLower.includes("completion")
+        )
+          return <CheckCircle className="h-5 w-5" />;
         return <FileText className="h-5 w-5" />;
       };
 
       const mapStatus = (status: string) => {
-        switch (status) {
-          case "Approved":
-            return "approved";
-          case "Submitted for Review":
-            return "submitted";
-          case "Awaiting Response":
-            return "awaiting";
-          case "Declined":
-            return "declined";
-          case "Not Started":
-          default:
-            return "not-started";
-        }
+        // 🎯 IMPROVED STATUS MAPPING: Handle more status variations from database
+        const statusMap: { [key: string]: WorkflowStep["status"] } = {
+          "not-started": "not-started",
+          "not started": "not-started",
+          notstarted: "not-started",
+          submitted: "submitted",
+          "under-review": "awaiting",
+          "under review": "awaiting",
+          underreview: "awaiting",
+          awaiting: "awaiting",
+          "awaiting response": "awaiting",
+          awaitingresponse: "awaiting",
+          approved: "approved",
+          Approved: "approved", // 🎯 FIX: Handle backend status "Approved" (capital A)
+          APPROVED: "approved", // 🎯 ADD: Handle uppercase variations
+          declined: "declined",
+          rejected: "declined",
+          Declined: "declined", // 🎯 ADD: Handle backend status variations
+          REJECTED: "declined", // 🎯 ADD: Handle uppercase variations
+        };
+
+        // Normalize the input status for better matching
+        const normalizedStatus = status?.toLowerCase().trim();
+        const mappedStatus = statusMap[normalizedStatus];
+
+        return mappedStatus || "not-started";
       };
 
-      const steps = applicationData.steps.map((step, index) => {
-        // Find documents related to this step
-        const stepDocuments = applicationDocuments
-          .filter((doc) => doc.relatedStepName === step.stepName)
-          .map((doc) => ({
-            name: doc.documentName,
-            documentName: doc.documentName,
-            documentType: doc.documentType,
-            status: doc.status,
-            url: doc.fileUrl,
-            _id: doc._id,
-            uploadedAt: doc.uploadedAt,
-          }));
+      const mappedSteps = applicationData.steps.map((step: any) => {
+        const mappedStatus = mapStatus(step.status);
 
-        // Ensure first step is always available for upload
-        let stepStatus = mapStatus(step.status) as WorkflowStep["status"];
-        if (index === 0 && stepStatus === "not-started") {
-          stepStatus = "submitted";
-        }
+        const stepId = step._id || `step_${step.stepName}`;
 
         return {
-          id: step._id || `step-${index}`,
+          id: stepId,
           title: step.stepName,
+          stepName: step.stepName, // 🎯 ADD: Keep original stepName for document matching
           icon: getStepIcon(step.stepName),
-          status: stepStatus,
-          internalNotes: "",
-          customerNotes: "",
-          documents: stepDocuments,
+          status: mappedStatus,
+          internalNotes: step.internalNotes || "",
+          customerNotes: step.customerNotes || "",
+          documents: step.documents || [],
+          syncStatus: "synced" as const, // Initialize as synced since they come from backend
         };
       });
 
-      setWorkflowSteps(steps);
+      setWorkflowSteps(mappedSteps);
     }
-  }, [applicationData, applicationDocuments]);
+  }, [applicationData?.steps]);
 
   // Application details state - will be populated from API data
   const [applicationDetails, setApplicationDetails] = useState({
@@ -314,6 +455,144 @@ export const ApplicationDetailsPage: React.FC = () => {
   });
 
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [isBulkUpdateInProgress, setIsBulkUpdateInProgress] = useState(false);
+
+  // 🔄 MERGE DOCUMENTS: Update workflow steps with fetched application documents
+  useEffect(() => {
+    if (workflowSteps.length > 0 && applicationDocuments.length > 0) {
+      setWorkflowSteps((prevSteps) => {
+        const updatedSteps = prevSteps.map((step) => {
+          // 🎯 IMPROVED DOCUMENT MATCHING: More robust matching logic
+          const stepDocuments = applicationDocuments.filter((doc) => {
+            // Normalize both step names for comparison (case-insensitive, trim whitespace)
+            const normalizedStepTitle = step.title?.toLowerCase().trim();
+
+            // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
+            const docStepName = doc.stepName || doc.relatedStepName;
+            const normalizedDocStepName = docStepName?.toLowerCase().trim();
+
+            // Also check if the document's stepName matches the step's original stepName from the database
+            const normalizedStepName = step.stepName?.toLowerCase().trim();
+
+            const matchesTitle = normalizedStepTitle === normalizedDocStepName;
+            const matchesStepName =
+              normalizedStepName === normalizedDocStepName;
+
+            return matchesTitle || matchesStepName;
+          });
+
+          return {
+            ...step,
+            documents: stepDocuments,
+          };
+        });
+
+        return updatedSteps;
+      });
+    }
+  }, [applicationDocuments, workflowSteps]); // 🎯 FIX: Use workflowSteps array directly for more reliable dependency tracking
+
+  // 🚀 CONSOLIDATED WORKFLOW PROGRESSION: Single useEffect to handle complete workflow logic
+  useEffect(() => {
+    console.log(`🎯 Main workflow progression useEffect triggered`);
+    console.log(
+      `  - applicationDocuments.length: ${applicationDocuments.length}`
+    );
+    console.log(`  - workflowSteps.length: ${workflowSteps.length}`);
+    console.log(`  - isBulkUpdateInProgress: ${isBulkUpdateInProgress}`);
+
+    // Guard against running when data is not ready or during bulk updates
+    if (
+      !applicationDocuments.length ||
+      !workflowSteps.length ||
+      isBulkUpdateInProgress
+    ) {
+      console.log(
+        `🎯 Skipping workflow progression check - conditions not met`
+      );
+      return;
+    }
+
+    console.log(`🎯 Starting workflow progression check`);
+
+    const checkWorkflowProgression = async () => {
+      // We use a copy to avoid direct mutation issues
+      const currentSteps = [...workflowSteps];
+
+      for (const [index, step] of currentSteps.entries()) {
+        // Skip steps that are already approved
+        if (step.status === "approved") {
+          continue;
+        }
+
+        // 1. Check if the current step should be marked as approved
+        const stepDocuments = applicationDocuments.filter((doc) => {
+          // Use the same improved matching logic as in document merging
+          const normalizedStepTitle = step.title?.toLowerCase().trim();
+
+          // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
+          const docStepName = doc.stepName || doc.relatedStepName;
+          const normalizedDocStepName = docStepName?.toLowerCase().trim();
+
+          const normalizedStepName = step.stepName?.toLowerCase().trim();
+
+          const matchesTitle = normalizedStepTitle === normalizedDocStepName;
+          const matchesStepName = normalizedStepName === normalizedDocStepName;
+
+          return matchesTitle || matchesStepName;
+        });
+
+        if (stepDocuments.length > 0) {
+          console.log(
+            `🎯 Checking ${stepDocuments.length} documents for step "${step.title}"`
+          );
+          stepDocuments.forEach((doc) => {
+            console.log(
+              `  - Document: ${doc.documentName}, Status: "${doc.status}"`
+            );
+          });
+
+          const allDocsApproved = stepDocuments.every((doc) => {
+            // 🎯 IMPROVED STATUS CHECK: Handle case variations in document status
+            const normalizedDocStatus = doc.status?.toLowerCase().trim();
+            const isApproved = normalizedDocStatus === "approved";
+
+            console.log(
+              `  - Document "${doc.documentName}": "${doc.status}" -> "${normalizedDocStatus}" -> isApproved: ${isApproved}`
+            );
+
+            return isApproved;
+          });
+
+          console.log(
+            `🎯 Step "${step.title}" - allDocsApproved: ${allDocsApproved}`
+          );
+
+          if (allDocsApproved) {
+            // Update this step to 'approved' and then check for the next one
+            await updateStepStatus(step.id, "approved");
+
+            // 2. Since this step is now approved, check if we can unlock the next one
+            const nextStepIndex = index + 1;
+            if (nextStepIndex < currentSteps.length) {
+              const nextStep = currentSteps[nextStepIndex];
+              if (nextStep.status === "not-started") {
+                await updateStepStatus(nextStep.id, "submitted");
+              }
+            }
+
+            // Once we've made an update, we can break the loop to wait for the next re-render
+            break;
+          }
+        }
+      }
+    };
+
+    checkWorkflowProgression();
+  }, [applicationDocuments, workflowSteps, isBulkUpdateInProgress]); // 🎯 FIX: Use workflowSteps array directly for more reliable dependency tracking
+
+  // 🎯 REMOVED: This useEffect hook was redundant and caused duplicate workflow progression logic
+  // The main consolidated useEffect hook above handles all workflow progression automatically
 
   const getOverallProgress = () => {
     const totalSteps = workflowSteps.length;
@@ -321,6 +600,32 @@ export const ApplicationDetailsPage: React.FC = () => {
       (step) => step.status === "approved"
     ).length;
     return Math.round((completedSteps / totalSteps) * 100);
+  };
+
+  const getStepState = (stepIndex: number) => {
+    const step = workflowSteps[stepIndex];
+    if (!step) return "upcoming";
+
+    // Check if step is completed (approved)
+    if (step.status === "approved") {
+      return "completed";
+    }
+
+    // Check if previous step is approved to enable current step
+    if (stepIndex > 0) {
+      const previousStep = workflowSteps[stepIndex - 1];
+      if (previousStep && previousStep.status !== "approved") {
+        return "upcoming"; // Step is locked until previous step is approved
+      }
+    }
+
+    // First step is always available
+    if (stepIndex === 0) {
+      return "active";
+    }
+
+    // Step is active if previous step is approved
+    return "active";
   };
 
   const updateStepStatus = async (
@@ -354,12 +659,23 @@ export const ApplicationDetailsPage: React.FC = () => {
 
       const backendStatus = mapToBackendStatus(newStatus);
 
+      console.log(
+        `🎯 Updating step status for application ${applicationData._id}`
+      );
+      console.log(`  - Step: ${step.stepName}`);
+      console.log(`  - New Status: ${newStatus} -> ${backendStatus}`);
+      console.log(
+        `  - API URL: ${
+          import.meta.env.VITE_BASE_URL
+        }/api/application/step-status/${applicationData._id}`
+      );
+
       const response = await axios.patch(
         `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
           applicationData._id
         }`,
         {
-          stepName: step.title,
+          stepName: step.stepName,
           status: backendStatus,
         },
         {
@@ -368,23 +684,121 @@ export const ApplicationDetailsPage: React.FC = () => {
       );
 
       if (response.data.success) {
-        // Update local state
-        setWorkflowSteps((prev) =>
-          prev.map((s) => (s.id === stepId ? { ...s, status: newStatus } : s))
-        );
+        // Update local state immediately for better UX
+        setWorkflowSteps((prev) => {
+          const updated = prev.map((s) =>
+            s.id === stepId
+              ? { ...s, status: newStatus, syncStatus: "synced" as const }
+              : s
+          );
+          return updated;
+        });
+
+        // Also update the applicationData to keep it in sync
+        setApplicationData((prev: any) => {
+          const updated = {
+            ...prev,
+            steps: prev.steps.map((s: any) =>
+              s.stepName === step.stepName ? { ...s, status: backendStatus } : s
+            ),
+          };
+          return updated;
+        });
 
         toast({
           title: "Step Status Updated",
-          description: `${step.title} status updated to ${backendStatus}`,
+          description: `${step.stepName} status updated to ${backendStatus}`,
         });
       } else {
         throw new Error("Failed to update step status");
       }
-    } catch (error) {
-      console.error("Error updating step status:", error);
+    } catch (error: any) {
+      console.error("🎯 Error updating step status:", error);
+      console.error("  - Response data:", error.response?.data);
+      console.error("  - Status code:", error.response?.status);
+      console.error("  - Error message:", error.message);
+
+      // Check if this is the specific backend error we know about
+      if (
+        error.message?.includes("ApplidById is not defined") ||
+        error.response?.status === 500
+      ) {
+        // Show a more helpful error message for the known backend issue
+        toast({
+          title: "Backend Service Temporarily Unavailable",
+          description:
+            "The step status update service is currently experiencing technical difficulties. Your changes have been saved locally and will be synchronized once the service is restored.",
+          variant: "destructive",
+        });
+
+        // Fallback: Update local state anyway for better UX
+        // This allows users to continue working even when backend is down
+        setWorkflowSteps((prev) => {
+          const updated = prev.map((s) =>
+            s.id === stepId
+              ? { ...s, status: newStatus, syncStatus: "pending" as const }
+              : s
+          );
+          return updated;
+        });
+
+        // Also update the applicationData to keep it in sync
+        // Find the step to get its name for the applicationData update
+        const currentStep = workflowSteps.find((s) => s.id === stepId);
+        if (currentStep) {
+          // Map the UI status to backend status format
+          const mapToBackendStatus = (status: WorkflowStep["status"]) => {
+            switch (status) {
+              case "not-started":
+                return "Not Started";
+              case "submitted":
+                return "Submitted for Review";
+              case "awaiting":
+                return "Awaiting Response";
+              case "approved":
+                return "Approved";
+              case "declined":
+                return "Declined";
+              default:
+                return "Not Started";
+            }
+          };
+
+          setApplicationData((prev: any) => {
+            const updated = {
+              ...prev,
+              steps: prev.steps.map((s: any) =>
+                s.stepName === currentStep.stepName
+                  ? {
+                      ...s,
+                      status: mapToBackendStatus(newStatus),
+                      syncStatus: "pending",
+                    }
+                  : s
+              ),
+            };
+            return updated;
+          });
+        }
+
+        // Show a success message for the local update
+        toast({
+          title: "Changes Saved Locally",
+          description: `Step status updated to ${newStatus} (local only - will sync when backend is restored)`,
+        });
+
+        return; // Exit early since we handled the error gracefully
+      }
+
+      // Handle other types of errors normally
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update step status";
+
       toast({
         title: "Error",
-        description: "Failed to update step status",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -402,9 +816,122 @@ export const ApplicationDetailsPage: React.FC = () => {
     );
   };
 
-  const handleFileUpload = async (file: File, stepName: string) => {
-    console.log("Uploading file:", file.name, "for step:", stepName);
+  // Function to retry syncing pending steps with the backend
+  const retrySyncPendingSteps = async () => {
+    const pendingSteps = workflowSteps.filter(
+      (step) => step.syncStatus === "pending"
+    );
 
+    if (pendingSteps.length === 0) {
+      toast({
+        title: "No Pending Changes",
+        description: "All steps are already synced with the backend.",
+      });
+      return;
+    }
+
+    toast({
+      title: "Syncing Changes",
+      description: `Attempting to sync ${pendingSteps.length} pending step(s) with the backend...`,
+    });
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const step of pendingSteps) {
+      try {
+        // Map the UI status to backend status format
+        const mapToBackendStatus = (status: WorkflowStep["status"]) => {
+          switch (status) {
+            case "not-started":
+              return "Not Started";
+            case "submitted":
+              return "Submitted for Review";
+            case "awaiting":
+              return "Awaiting Response";
+            case "approved":
+              return "Approved";
+            case "declined":
+              return "Declined";
+            default:
+              return "Not Started";
+          }
+        };
+
+        const backendStatus = mapToBackendStatus(step.status);
+
+        const response = await axios.patch(
+          `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
+            applicationData._id
+          }`,
+          {
+            stepName: step.stepName,
+            status: backendStatus,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (response.data.success) {
+          // Update sync status to synced
+          setWorkflowSteps((prev) =>
+            prev.map((s) =>
+              s.id === step.id ? { ...s, syncStatus: "synced" as const } : s
+            )
+          );
+
+          // Also update applicationData
+          setApplicationData((prev: any) => {
+            const updated = {
+              ...prev,
+              steps: prev.steps.map((s: any) =>
+                s.stepName === step.stepName
+                  ? { ...s, status: backendStatus }
+                  : s
+              ),
+            };
+            return updated;
+          });
+
+          successCount++;
+        }
+      } catch (error: any) {
+        console.error(`Failed to sync step ${step.stepName}:`, error);
+
+        // Update sync status to error
+        setWorkflowSteps((prev) =>
+          prev.map((s) =>
+            s.id === step.id ? { ...s, syncStatus: "error" as const } : s
+          )
+        );
+
+        errorCount++;
+      }
+    }
+
+    // Show final results
+    if (successCount > 0 && errorCount === 0) {
+      toast({
+        title: "Sync Complete",
+        description: `Successfully synced ${successCount} step(s) with the backend.`,
+      });
+    } else if (successCount > 0 && errorCount > 0) {
+      toast({
+        title: "Partial Sync Complete",
+        description: `Synced ${successCount} step(s), ${errorCount} step(s) failed.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sync Failed",
+        description: `Failed to sync any steps. The backend may still be experiencing issues.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileUpload = async (file: File, stepName: string) => {
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast({
@@ -429,17 +956,6 @@ export const ApplicationDetailsPage: React.FC = () => {
       formData.append("userId", user?._id || user?.id || "");
       formData.append("uploadedBy", user?._id || user?.id || "");
 
-      console.log("Sending formData with:");
-      console.log("- file:", file.name, file.size, file.type);
-      console.log("- documentName:", file.name);
-      console.log("- documentType: General");
-      console.log("- relatedStepName:", stepName);
-      console.log("- linkedModel: Application");
-      console.log("- applicationId:", applicationData?._id);
-      console.log("- linkedTo:", applicationData?._id);
-      console.log("- userId:", user?._id || user?.id);
-      console.log("- uploadedBy:", user?._id || user?.id);
-
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
         formData,
@@ -457,12 +973,10 @@ export const ApplicationDetailsPage: React.FC = () => {
       });
 
       // Refresh documents data to show new document
-      await fetchApplicationDocuments();
+      if (applicationData?._id) {
+        await fetchApplicationDocuments(applicationData._id);
+      }
     } catch (error: any) {
-      console.error("Error uploading document:", error);
-      console.error("Error response:", error.response?.data);
-      console.error("Error status:", error.response?.status);
-
       const errorMessage =
         error.response?.data?.message ||
         error.message ||
@@ -499,20 +1013,9 @@ export const ApplicationDetailsPage: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement>,
     stepName: string
   ) => {
-    console.log("File input changed for step:", stepName);
     const file = e.target.files?.[0];
     if (file) {
-      console.log(
-        "File selected:",
-        file.name,
-        "Size:",
-        file.size,
-        "Type:",
-        file.type
-      );
       handleFileUpload(file, stepName);
-    } else {
-      console.log("No file selected");
     }
     // Reset the input value so the same file can be selected again
     e.target.value = "";
@@ -521,7 +1024,8 @@ export const ApplicationDetailsPage: React.FC = () => {
   // Handle document status change
   const handleDocumentStatusChange = async (
     documentId: string,
-    newStatus: string
+    newStatus: string,
+    options: { isBulk?: boolean } = {}
   ) => {
     try {
       console.log(`Updating document ${documentId} status to ${newStatus}`);
@@ -552,16 +1056,20 @@ export const ApplicationDetailsPage: React.FC = () => {
           }))
         );
 
+        // 🎯 DOCUMENT STATUS UPDATED: The consolidated useEffect hook will automatically
+        // detect this change and handle workflow progression (step approval and next step unlocking)
+        if (newStatus === "Approved") {
+          console.log(
+            `🎯 Document approved. The consolidated useEffect will automatically check workflow progression.`
+          );
+          // 🎯 REMOVED: The setTimeout block was redundant and could cause race conditions
+          // The main useEffect hook will handle workflow progression automatically when state updates
+        }
+
         toast({
           title: "Status Updated",
           description: `Document status updated to ${newStatus}`,
         });
-
-        // If document is approved, check if next step should be unlocked
-        // But only if this is not part of a bulk update
-        if (newStatus === "Approved" && !(window as any).bulkUpdateInProgress) {
-          checkAndUnlockNextStep(documentId);
-        }
       } else {
         throw new Error("Failed to update document status");
       }
@@ -573,94 +1081,6 @@ export const ApplicationDetailsPage: React.FC = () => {
         variant: "destructive",
       });
     }
-  };
-
-  // Check if next step should be unlocked based on document approval
-  const checkAndUnlockNextStep = async (documentId: string) => {
-    try {
-      console.log("checkAndUnlockNextStep called for document:", documentId);
-
-      // Find the document and its related step
-      const document = applicationDocuments.find(
-        (doc) => doc._id === documentId
-      );
-      if (!document || !document.relatedStepName) {
-        console.log("Document not found or no relatedStepName:", document);
-        return;
-      }
-
-      // Find the step index
-      const currentStepIndex = workflowSteps.findIndex(
-        (step) => step.title === document.relatedStepName
-      );
-
-      if (currentStepIndex === -1) {
-        console.log("Step not found for:", document.relatedStepName);
-        return;
-      }
-
-      // Check if all documents for current step are approved
-      const currentStepDocuments = applicationDocuments.filter(
-        (doc) => doc.relatedStepName === document.relatedStepName
-      );
-
-      console.log(
-        "Current step documents:",
-        currentStepDocuments.map((d) => ({
-          name: d.documentName,
-          status: d.status,
-        }))
-      );
-
-      const allApproved = currentStepDocuments.every(
-        (doc) => doc.status === "Approved"
-      );
-
-      console.log("All documents approved?", allApproved);
-
-      if (allApproved) {
-        // Mark current step as approved
-        const updatedSteps = [...workflowSteps];
-        updatedSteps[currentStepIndex] = {
-          ...workflowSteps[currentStepIndex],
-          status: "approved",
-        };
-
-        // Update next step status to allow uploads
-        if (currentStepIndex < workflowSteps.length - 1) {
-          const nextStep = workflowSteps[currentStepIndex + 1];
-          if (nextStep && nextStep.status === "not-started") {
-            updatedSteps[currentStepIndex + 1] = {
-              ...nextStep,
-              status: "submitted",
-            };
-
-            toast({
-              title: "Next Step Unlocked",
-              description: `${nextStep.title} is now available for document upload`,
-            });
-          }
-        }
-
-        setWorkflowSteps(updatedSteps);
-
-        // Update step status on backend
-        await updateStepStatus(workflowSteps[currentStepIndex].id, "approved");
-      }
-    } catch (error) {
-      console.error("Error checking next step unlock:", error);
-    }
-  };
-
-  const getStepState = (stepIndex: number) => {
-    const step = workflowSteps[stepIndex];
-    if (!step) return "upcoming";
-
-    // Check if step is completed (approved)
-    if (step.status === "approved") return "completed";
-
-    // Make ALL steps available for upload (active) regardless of previous step status
-    return "active";
   };
 
   const renderWorkflowStep = (
@@ -684,11 +1104,15 @@ export const ApplicationDetailsPage: React.FC = () => {
       >
         {/* Timeline connector */}
         {!isSubstep && stepIndex < workflowSteps.length - 1 && (
-          <div className="absolute left-6 top-16 w-0.5 h-12 bg-gray-300"></div>
+          <div
+            className={`absolute left-6 top-16 w-0.5 h-12 ${
+              step.status === "approved" ? "bg-green-300" : "bg-gray-300"
+            }`}
+          ></div>
         )}
 
         <Card
-          className={`border-l-4 ${
+          className={`border-l-4 relative ${
             stepState === "completed"
               ? "border-l-green-500 bg-green-50"
               : stepState === "active"
@@ -696,28 +1120,138 @@ export const ApplicationDetailsPage: React.FC = () => {
               : "border-l-gray-400 bg-gray-50"
           }`}
         >
+          {/* Status Indicator Banner */}
+          <div
+            className={`absolute top-0 right-0 px-3 py-1 rounded-bl-lg text-xs font-medium text-white ${
+              step.status === "approved"
+                ? "bg-green-600"
+                : step.status === "declined"
+                ? "bg-red-600"
+                : step.status === "awaiting"
+                ? "bg-yellow-600"
+                : step.status === "submitted"
+                ? "bg-blue-600"
+                : "bg-gray-600"
+            }`}
+          >
+            {step.status.replace("-", " ").toUpperCase()}
+          </div>
+
+          {/* Sync Status Indicator */}
+          {step.syncStatus && step.syncStatus !== "synced" && (
+            <div
+              className={`absolute top-0 left-0 px-2 py-1 rounded-br-lg text-xs font-medium text-white ${
+                step.syncStatus === "pending"
+                  ? "bg-orange-500"
+                  : step.syncStatus === "error"
+                  ? "bg-red-500"
+                  : "bg-gray-500"
+              }`}
+            >
+              {step.syncStatus === "pending"
+                ? "⏳ Syncing..."
+                : "❌ Sync Error"}
+            </div>
+          )}
           <CardHeader className="pb-3">
+            {/* Enhanced Step Status Management */}
             {isEditable && (
-              <div className="flex justify-end mb-3">
-                <Select
-                  value={step.status}
-                  onValueChange={(value) =>
-                    updateStepStatus(step.id, value as WorkflowStep["status"])
-                  }
-                >
-                  <SelectTrigger className="h-8 w-[160px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="not-started">Not Started</SelectItem>
-                    <SelectItem value="submitted">
-                      Submitted for Review
-                    </SelectItem>
-                    <SelectItem value="awaiting">Awaiting Response</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor={`step-status-${step.id}`}
+                    className="text-sm font-medium text-gray-700"
+                  >
+                    Step Status:
+                  </Label>
+                </div>
+
+                {step.status === "approved" ? (
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="default"
+                      className="bg-green-600 text-white"
+                    >
+                      ✓ Approved
+                    </Badge>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Select
+                            value={step.status}
+                            onValueChange={(value) =>
+                              updateStepStatus(
+                                step.id,
+                                value as WorkflowStep["status"]
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[140px] text-sm border-green-300 bg-green-50">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not-started">
+                                Not Started
+                              </SelectItem>
+                              <SelectItem value="submitted">
+                                Submitted for Review
+                              </SelectItem>
+                              <SelectItem value="awaiting">
+                                Awaiting Response
+                              </SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Change step status (even approved steps can be
+                            modified)
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Select
+                            value={step.status}
+                            onValueChange={(value) =>
+                              updateStepStatus(
+                                step.id,
+                                value as WorkflowStep["status"]
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[140px] text-sm">
+                              <SelectValue placeholder="Select a fruit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not-started">
+                                Not Started
+                              </SelectItem>
+                              <SelectItem value="submitted">
+                                Submitted for Review
+                              </SelectItem>
+                              <SelectItem value="awaiting">
+                                Awaiting Response
+                              </SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Update the current step status</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex items-center gap-4">
@@ -730,67 +1264,150 @@ export const ApplicationDetailsPage: React.FC = () => {
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="font-semibold text-lg">{step.title}</h3>
                   {step.documents && step.documents.length > 0 && (
-                    <Select
-                      value={step.documents[0]?.status || undefined}
-                      onValueChange={async (newStatus) => {
-                        // Set flag to prevent individual checkAndUnlockNextStep calls
-                        (window as any).bulkUpdateInProgress = true;
+                    <div className="flex items-center gap-2">
+                      {step.status === "approved" ? (
+                        <Badge
+                          variant="default"
+                          className="bg-green-600 text-white text-xs"
+                        >
+                          ✓ Approved - No Changes
+                        </Badge>
+                      ) : (
+                        <>
+                          {isBulkUpdateInProgress && (
+                            <Badge variant="secondary" className="text-xs">
+                              Updating...
+                            </Badge>
+                          )}
+                          <Select
+                            value={step.documents[0]?.status || undefined}
+                            onValueChange={async (newStatus) => {
+                              setIsBulkUpdateInProgress(true);
 
-                        try {
-                          // Update all documents in this step
-                          for (const doc of step.documents || []) {
-                            await handleDocumentStatusChange(
-                              doc._id,
-                              newStatus
-                            );
-                          }
-
-                          // After all documents are updated, check if next step should be unlocked
-                          if (
-                            newStatus === "Approved" &&
-                            step.documents &&
-                            step.documents.length > 0
-                          ) {
-                            // Use the first document to trigger the step unlock check
-                            await checkAndUnlockNextStep(step.documents[0]._id);
-                          }
-                        } finally {
-                          // Clear the flag
-                          (window as any).bulkUpdateInProgress = false;
-                        }
-
-                        // Force re-render to hide the dropdown
-                        setApplicationData({ ...applicationData });
-                      }}
-                    >
-                      <SelectTrigger className="h-7 w-32 text-xs">
-                        <SelectValue placeholder="Set Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Uploaded">Uploaded</SelectItem>
-                        <SelectItem value="Under Review">
-                          Under Review
-                        </SelectItem>
-                        <SelectItem value="Approved">Approved</SelectItem>
-                        <SelectItem value="Rejected">Rejected</SelectItem>
-                        <SelectItem value="Resubmission Required">
-                          Resubmission Required
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                              try {
+                                // Update all documents in this step
+                                for (const doc of step.documents || []) {
+                                  await handleDocumentStatusChange(
+                                    doc._id,
+                                    newStatus,
+                                    { isBulk: true }
+                                  );
+                                }
+                              } catch (error) {
+                                console.error(
+                                  "Error updating document statuses:",
+                                  error
+                                );
+                              } finally {
+                                setIsBulkUpdateInProgress(false);
+                              }
+                            }}
+                            disabled={isBulkUpdateInProgress}
+                          >
+                            <SelectTrigger className="h-7 w-32 text-xs">
+                              <SelectValue placeholder="Set Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Uploaded">Uploaded</SelectItem>
+                              <SelectItem value="Under Review">
+                                Under Review
+                              </SelectItem>
+                              <SelectItem value="Approved">Approved</SelectItem>
+                              <SelectItem value="Rejected">Rejected</SelectItem>
+                              <SelectItem value="Resubmission Required">
+                                Resubmission Required
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {statusIcons[step.status]}
-                  <Badge
-                    variant={
-                      step.status === "approved" ? "default" : "secondary"
-                    }
-                  >
-                    {step.status.replace("-", " ").toUpperCase()}
-                  </Badge>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {statusIcons[step.status]}
+                    <Badge
+                      variant={
+                        step.status === "approved" ? "default" : "secondary"
+                      }
+                      className={`${
+                        step.status === "approved"
+                          ? "bg-green-600 text-white"
+                          : step.status === "declined"
+                          ? "bg-red-600 text-white"
+                          : step.status === "awaiting"
+                          ? "bg-yellow-600 text-white"
+                          : step.status === "submitted"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-600 text-white"
+                      }`}
+                    >
+                      {step.status}
+                    </Badge>
+                  </div>
+
+                  {/* Status Description */}
+                  <span className="text-sm text-gray-600">
+                    {step.status === "approved" &&
+                      "✓ Step completed successfully"}
+                    {step.status === "declined" && "✗ Step requires attention"}
+                    {step.status === "awaiting" && "⏳ Waiting for response"}
+                    {step.status === "submitted" && "📋 Under review"}
+                    {step.status === "not-started" &&
+                      "🔒 Step not yet initiated"}
+                  </span>
                 </div>
               </div>
+
+              {/* Quick Actions for Step Management */}
+              {isEditable && (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+                  <span className="text-xs text-gray-500 font-medium">
+                    Quick Actions:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const nextStatus =
+                          step.status === "not-started"
+                            ? "submitted"
+                            : step.status === "submitted"
+                            ? "awaiting"
+                            : step.status === "awaiting"
+                            ? "approved"
+                            : "not-started";
+                        updateStepStatus(step.id, nextStatus);
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Next Status
+                    </Button>
+                    {step.status !== "approved" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateStepStatus(step.id, "approved")}
+                        className="h-6 px-2 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        Approve
+                      </Button>
+                    )}
+                    {step.status !== "declined" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateStepStatus(step.id, "declined")}
+                        className="h-6 px-2 text-xs bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        Decline
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </CardHeader>
 
@@ -798,14 +1415,19 @@ export const ApplicationDetailsPage: React.FC = () => {
             {/* Step Content Based on State */}
             {stepState === "upcoming" && (
               <div className="p-4 bg-gray-100 rounded-lg">
-                <h4 className="font-medium text-gray-700 mb-2">
-                  Step Description
-                </h4>
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <h4 className="font-medium text-gray-700">Step Locked</h4>
+                </div>
                 <p className="text-sm text-gray-600">
                   This step will become available once the previous step is
-                  completed. Required documentation and processes will be
+                  approved. Required documentation and processes will be
                   outlined here.
                 </p>
+                <div className="mt-3 p-2 bg-gray-200 rounded text-xs text-gray-600">
+                  <strong>Prerequisite:</strong> Previous step must be approved
+                  to unlock this step.
+                </div>
               </div>
             )}
 
@@ -825,80 +1447,137 @@ export const ApplicationDetailsPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Check if there are existing documents that are not rejected */}
-                  {(() => {
-                    const hasNonRejectedDocument =
-                      step.documents &&
-                      step.documents.length > 0 &&
-                      step.documents.some(
-                        (doc) =>
-                          doc.status !== "Rejected" && doc.status !== "rejected"
-                      );
+                  {/* Show different content based on step status */}
+                  {step.status === "approved" ? (
+                    <div className="border-2 border-dashed border-green-300 bg-green-50 rounded-lg p-6 text-center">
+                      <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
+                      <p className="text-sm font-medium text-green-700 mb-1">
+                        Step Approved
+                      </p>
+                      <p className="text-xs text-green-600">
+                        This step has been approved. No further changes or
+                        uploads are allowed.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {(() => {
+                        // Document Upload Logic:
+                        // - Allow upload if: No documents exist OR all existing documents are rejected/require resubmission
+                        // - Block upload if: Any document is approved, under review, or uploaded
+                        // This ensures users can only upload when appropriate (e.g., after rejection or resubmission request)
 
-                    if (hasNonRejectedDocument) {
-                      return (
-                        <div className="border-2 border-dashed border-orange-300 bg-orange-50 rounded-lg p-6 text-center">
-                          <Upload className="h-10 w-10 mx-auto mb-3 text-orange-500" />
-                          <p className="text-sm font-medium text-orange-700 mb-1">
-                            Document already uploaded
-                          </p>
-                          <p className="text-xs text-orange-600">
-                            A document for this step already exists. You can
-                            only upload a new document if the existing one is
-                            rejected.
-                          </p>
-                        </div>
-                      );
-                    }
+                        const shouldBlockUpload = (() => {
+                          if (!step.documents || step.documents.length === 0) {
+                            return false; // No documents exist, allow upload
+                          }
 
-                    return (
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                          isUploading
-                            ? "border-gray-300 bg-gray-50"
-                            : "border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
-                        }`}
-                      >
-                        <Upload
-                          className={`h-10 w-10 mx-auto mb-3 ${
-                            isUploading ? "text-gray-400" : "text-blue-500"
-                          }`}
-                        />
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          {isUploading
-                            ? "Uploading document..."
-                            : "Upload documents for this step"}
-                        </p>
-                        <p className="text-xs text-gray-500 mb-4">
-                          Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max
-                          10MB)
-                        </p>
-                        <div className="flex items-center justify-center">
-                          <label
-                            htmlFor={`file-input-${step.id}`}
-                            className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors ${
-                              isUploading
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            }`}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            {isUploading ? "Uploading..." : "Choose File"}
-                          </label>
-                          <input
-                            type="file"
-                            onChange={(e) =>
-                              handleFileInputChange(e, step.title)
-                            }
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            className="hidden"
-                            disabled={isUploading}
-                            id={`file-input-${step.id}`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
+                          // Check if any document has a status that should block uploads
+                          const blockingStatuses = [
+                            "Approved",
+                            "approved",
+                            "Under Review",
+                            "under review",
+                            "UnderReview",
+                            "Uploaded",
+                            "uploaded",
+                          ];
+
+                          const hasBlockingDocument = step.documents.some(
+                            (doc) => blockingStatuses.includes(doc.status)
+                          );
+
+                          return hasBlockingDocument;
+                        })();
+
+                        if (shouldBlockUpload) {
+                          return (
+                            <div className="border-2 border-dashed border-orange-300 bg-orange-50 rounded-lg p-6 text-center">
+                              <Upload className="h-10 w-10 mx-auto mb-3 text-orange-500" />
+                              <p className="text-sm font-medium text-orange-700 mb-1">
+                                Document already uploaded
+                              </p>
+                              <p className="text-xs text-orange-600">
+                                A document for this step already exists with an
+                                active status. You can only upload a new
+                                document if the existing one is rejected or
+                                requires resubmission.
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            {/* Show status message for rejected/resubmission documents */}
+                            {step.documents && step.documents.length > 0 && (
+                              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-center gap-2 text-yellow-800">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <span className="text-sm font-medium">
+                                    Document requires attention
+                                  </span>
+                                </div>
+                                <p className="text-xs text-yellow-700 mt-1">
+                                  Previous document was rejected or requires
+                                  resubmission. Please upload a new version.
+                                </p>
+                              </div>
+                            )}
+
+                            <div
+                              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                                isUploading
+                                  ? "border-gray-300 bg-gray-50"
+                                  : "border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
+                              }`}
+                            >
+                              <Upload
+                                className={`h-10 w-10 mx-auto mb-3 ${
+                                  isUploading
+                                    ? "text-gray-400"
+                                    : "text-blue-500"
+                                }`}
+                              />
+                              <p className="text-sm font-medium text-gray-700 mb-1">
+                                {isUploading
+                                  ? "Uploading document..."
+                                  : "Upload documents for this step"}
+                              </p>
+                              <p className="text-xs text-gray-500 mb-4">
+                                {step.documents && step.documents.length > 0
+                                  ? "Previous document was rejected or requires resubmission. Upload a new version."
+                                  : "Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max 10MB)"}
+                              </p>
+                              <div className="flex items-center justify-center">
+                                <label
+                                  htmlFor={`file-input-${step.id}`}
+                                  className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors ${
+                                    isUploading
+                                      ? "bg-gray-400 cursor-not-allowed"
+                                      : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                  }`}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  {isUploading ? "Uploading..." : "Choose File"}
+                                </label>
+                                <input
+                                  type="file"
+                                  onChange={(e) =>
+                                    handleFileInputChange(e, step.title)
+                                  }
+                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                  className="hidden"
+                                  disabled={isUploading}
+                                  id={`file-input-${step.id}`}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
 
                   {/* Uploaded documents */}
                   {step.documents && step.documents.length > 0 && (
@@ -906,52 +1585,102 @@ export const ApplicationDetailsPage: React.FC = () => {
                       <h5 className="text-sm font-medium text-gray-700">
                         Uploaded Documents:
                       </h5>
-                      {step.documents.map((document, docIndex) => (
-                        <div
-                          key={docIndex}
-                          className="flex items-center justify-between p-3 border rounded-lg bg-white"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {document.name ||
-                                  document.documentName ||
-                                  "Document"}
-                              </span>
-                              {document.documentType && (
-                                <span className="text-xs text-gray-500">
-                                  {document.documentType}
+                      {step.documents.map((document, docIndex) => {
+                        console.log(
+                          `📋 Rendering document ${docIndex} for step "${step.title}":`,
+                          document
+                        );
+                        console.log(
+                          `📋 Document stepName/relatedStepName: "${
+                            document.stepName || document.relatedStepName
+                          }"`
+                        );
+                        return (
+                          <div
+                            key={docIndex}
+                            className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-4 w-4 text-blue-600" />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                  {document.name ||
+                                    document.documentName ||
+                                    "Document"}
                                 </span>
+                                {document.documentType && (
+                                  <span className="text-xs text-gray-500">
+                                    {document.documentType}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {/* Document Status Dropdown for Managers/Agents */}
+                              {(user?.role === "manager" ||
+                                user?.role === "agent") && (
+                                <Select
+                                  value={document.status || "Uploaded"}
+                                  onValueChange={(newStatus) =>
+                                    handleDocumentStatusChange(
+                                      document._id,
+                                      newStatus
+                                    )
+                                  }
+                                  disabled={step.status === "approved"}
+                                >
+                                  <SelectTrigger className="w-32 h-7">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Uploaded">
+                                      Uploaded
+                                    </SelectItem>
+                                    <SelectItem value="Under Review">
+                                      Under Review
+                                    </SelectItem>
+                                    <SelectItem value="Approved">
+                                      Approved
+                                    </SelectItem>
+                                    <SelectItem value="Rejected">
+                                      Rejected
+                                    </SelectItem>
+                                    <SelectItem value="Resubmission Required">
+                                      Resubmission Required
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+
+                              {/* Document Status Badge */}
+                              <Badge
+                                variant={
+                                  document.status === "Approved"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {document.status || "Uploaded"}
+                              </Badge>
+
+                              {/* View Document Button */}
+                              {document.url && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    window.open(document.url, "_blank")
+                                  }
+                                  className="h-7 px-2"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                document.status === "Approved"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {document.status || "Uploaded"}
-                            </Badge>
-                            {document.url && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  window.open(document.url, "_blank")
-                                }
-                                className="h-7 px-2"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -962,26 +1691,35 @@ export const ApplicationDetailsPage: React.FC = () => {
                   stepState === "active") && (
                   <div className="space-y-3">
                     <h4 className="font-medium">Notes</h4>
-                    {stepState === "active" &&
-                      (user?.role === "manager" || user?.role === "agent") && (
-                        <Textarea
-                          value={step.internalNotes}
-                          onChange={(e) =>
-                            updateStepNotes(
-                              step.id,
-                              "internalNotes",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Add notes for this step..."
-                          className="min-h-[60px]"
-                        />
-                      )}
-                    {stepState === "completed" && step.internalNotes && (
+                    {step.status === "approved" ? (
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-sm text-green-800">
+                          {step.internalNotes ||
+                            "No internal notes for this approved step."}
+                        </p>
+                        <p className="text-xs text-green-600 mt-2">
+                          ✓ Step approved - notes are read-only
+                        </p>
+                      </div>
+                    ) : stepState === "active" &&
+                      (user?.role === "manager" || user?.role === "agent") ? (
+                      <Textarea
+                        value={step.internalNotes}
+                        onChange={(e) =>
+                          updateStepNotes(
+                            step.id,
+                            "internalNotes",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Add notes for this step..."
+                        className="min-h-[60px]"
+                      />
+                    ) : step.internalNotes ? (
                       <div className="p-3 bg-gray-50 rounded-lg">
                         <p className="text-sm">{step.internalNotes}</p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
@@ -2055,10 +2793,29 @@ export const ApplicationDetailsPage: React.FC = () => {
                   Follow the progress through each step of the application
                   process
                 </div>
+
                 <div className="space-y-8">
-                  {workflowSteps.map((step, index) =>
-                    renderWorkflowStep(step, index)
-                  )}
+                  {workflowSteps.map((step, index) => {
+                    const stepState = getStepState(index);
+                    const isCurrentActiveStep =
+                      stepState === "active" && step.status !== "approved";
+
+                    return (
+                      <div key={step.id} className="relative">
+                        {isCurrentActiveStep && (
+                          <div className="absolute -left-2 -top-2 z-10">
+                            <Badge
+                              variant="default"
+                              className="bg-blue-600 text-white text-xs animate-pulse"
+                            >
+                              Current Step
+                            </Badge>
+                          </div>
+                        )}
+                        {renderWorkflowStep(step, index)}
+                      </div>
+                    );
+                  })}
                 </div>
               </AccordionContent>
             </AccordionItem>

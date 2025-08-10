@@ -91,7 +91,9 @@ export const ApplicationsPage: React.FC = () => {
       if (!selectedApp?.customer?._id || !token) return;
       try {
         const customerResponse = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/api/user/customer/${selectedApp.customer._id}`,
+          `${import.meta.env.VITE_BASE_URL}/api/user/customer/${
+            selectedApp.customer._id
+          }`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setCustomerProfile(customerResponse.data.data);
@@ -195,8 +197,8 @@ export const ApplicationsPage: React.FC = () => {
       }
 
       const response = await axios.patch(
-        `${import.meta.env.VITE_BASE_URL}/api/application/stepStatus/${
-          selectedApp.customer._id
+        `${import.meta.env.VITE_BASE_URL}/api/application/step-status/${
+          selectedApp._id
         }`,
         {
           stepName: step.stepName,
