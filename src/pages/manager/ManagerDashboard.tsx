@@ -60,6 +60,16 @@ interface Application {
   createdAt: string;
 }
 
+interface Notification {
+  _id: string;
+  title: string;
+  message: string;
+  type: string;
+  status: "Read" | "Unread";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const ManagerDashboard: React.FC = () => {
   const { toast } = useToast();
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
@@ -75,7 +85,8 @@ export const ManagerDashboard: React.FC = () => {
   const [recentAgents, setRecentAgents] = useState<any[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [allApplications, setAllApplications] = useState<Application[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
 
   // Memoized fetch functions to prevent unnecessary re-renders
   const fetchAgents = useCallback(async () => {
@@ -172,23 +183,36 @@ export const ManagerDashboard: React.FC = () => {
   }, [token]);
 
   const fetchNotifications = useCallback(async () => {
-    if (!token || !user?.userId) return;
+    if (!token || !user?.id) return;
     try {
       setLoadingNotifications(true);
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/api/notification/admin/${
-          user.userId
+          user.id
         }`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setNotifications(response.data.data || []);
+      const newNotifications = response.data.data || [];
+      
+      // Check if there are new unread notifications
+      const currentUnreadCount = newNotifications.filter(n => n.status === "Unread").length;
+      if (currentUnreadCount > previousNotificationCount && previousNotificationCount > 0) {
+        toast({
+          title: "New Notifications",
+          description: `You have ${currentUnreadCount} unread notifications`,
+          variant: "default",
+        });
+      }
+      
+      setPreviousNotificationCount(currentUnreadCount);
+      setNotifications(newNotifications);
     } catch (error) {
       console.error("Error fetching notifications:", error);
       setNotifications([]);
     } finally {
       setLoadingNotifications(false);
     }
-  }, [token, user?.userId]);
+  }, [token, user?.id, previousNotificationCount]);
 
   useEffect(() => {
     fetchAgents();
@@ -202,6 +226,17 @@ export const ManagerDashboard: React.FC = () => {
     fetchApplications,
     fetchNotifications,
   ]);
+
+  // Refresh notifications every 30 seconds
+  useEffect(() => {
+    if (!token || !user?.id) return;
+    
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [token, user?.id, fetchNotifications]);
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -223,6 +258,30 @@ export const ManagerDashboard: React.FC = () => {
       );
     } catch (error) {
       console.error("Error marking notification as read:", error);
+    }
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = async () => {
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_BASE_URL}/api/notification/clear-all`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Clear notifications locally
+      setNotifications([]);
+      toast({
+        title: "Notifications cleared",
+        description: "All notifications have been cleared.",
+      });
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clear notifications. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -317,6 +376,7 @@ export const ManagerDashboard: React.FC = () => {
     totalCustomers: allCustomers.length,
     completionRate: completionRate,
     pendingPayments: 0, // Static value as requested
+    unreadNotifications: notifications.filter(n => n.status === "Unread").length,
   };
 
   // Daily tasks for managers
@@ -361,6 +421,16 @@ export const ManagerDashboard: React.FC = () => {
       link: "/manager/customers",
       completed: false,
     },
+    {
+      id: 5,
+      title: "Check Notifications",
+      description: `${stats.unreadNotifications} unread notifications`,
+      icon: Bell,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      link: "#",
+      completed: stats.unreadNotifications === 0,
+    },
   ];
 
   // Loading state
@@ -372,7 +442,14 @@ export const ManagerDashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
         <div className="">
-          <h1 className="text-3xl font-bold text-primary">Manager Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-primary">Manager Dashboard</h1>
+            {stats.unreadNotifications > 0 && (
+              <Badge variant="secondary" className="text-sm">
+                {stats.unreadNotifications} notifications
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Overview of all operations and performance
           </p>
@@ -455,7 +532,7 @@ export const ManagerDashboard: React.FC = () => {
       </div>
 
       {/* Key Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -503,6 +580,20 @@ export const ManagerDashboard: React.FC = () => {
                 <p className="text-2xl font-bold">{stats.pendingPayments}</p>
               </div>
               <DollarSign className="h-8 w-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Unread Notifications</p>
+                <p className="text-2xl font-bold">
+                  {stats.unreadNotifications}
+                </p>
+              </div>
+              <Bell className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -678,14 +769,7 @@ export const ManagerDashboard: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    // Clear all notifications
-                    setNotifications([]);
-                    toast({
-                      title: "Notifications cleared",
-                      description: "All notifications have been cleared.",
-                    });
-                  }}
+                  onClick={clearAllNotifications}
                 >
                   Clear All
                 </Button>

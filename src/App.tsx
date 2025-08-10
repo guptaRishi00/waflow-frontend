@@ -37,6 +37,7 @@ import VisaApplicationsPage from "./pages/agent/VisaApplicationsPage";
 // Manager Pages
 import { ManagerDashboard } from "./pages/manager/ManagerDashboard";
 import { DirectoryPage as ManagerDirectoryPage } from "./pages/manager/DirectoryPage";
+import { DocumentDirectoryPage } from "./pages/manager/DocumentDirectoryPage";
 import { AgentsPage } from "./pages/manager/AgentsPage";
 import { ManagerApplicationsPage } from "./pages/manager/ManagerApplicationsPage";
 import { ManagerCustomersPage } from "./pages/manager/ManagerCustomersPage";
@@ -151,6 +152,7 @@ const AppRoutes = () => {
                 />
                 <Route path="customers" element={<ManagerCustomersPage />} />
                 <Route path="directory" element={<ManagerDirectoryPage />} />
+                <Route path="document-directory" element={<DocumentDirectoryPage />} />
                 <Route
                   path="visa-applications"
                   element={<ManagerVisaApplicationsPage />}

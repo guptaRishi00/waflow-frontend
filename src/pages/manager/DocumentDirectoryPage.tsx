@@ -21,7 +21,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
-import { ApplicationDocumentsModal } from "@/components/modals/ApplicationDocumentsModal";
 
 interface Application {
   _id: string;
@@ -37,7 +36,7 @@ interface Application {
   createdAt: string;
 }
 
-export const DirectoryPage: React.FC = () => {
+export const DocumentDirectoryPage: React.FC = () => {
   const { token } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,9 +50,6 @@ export const DirectoryPage: React.FC = () => {
   const [documentLoadingStates, setDocumentLoadingStates] = useState<{
     [key: string]: boolean;
   }>({});
-  const [selectedApplication, setSelectedApplication] =
-    useState<Application | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch all applications with document information
   useEffect(() => {
@@ -240,9 +236,9 @@ export const DirectoryPage: React.FC = () => {
   };
 
   // Handle view application
-  const handleViewApplication = (application: Application) => {
+  const handleViewApplication = (applicationId: string) => {
     // Check if it's a mock application
-    if (application._id.startsWith("mock-")) {
+    if (applicationId.startsWith("mock-")) {
       toast({
         title: "Demo Mode",
         description:
@@ -252,9 +248,8 @@ export const DirectoryPage: React.FC = () => {
       return;
     }
 
-    // Open the documents modal
-    setSelectedApplication(application);
-    setIsModalOpen(true);
+    // Navigate to application details page
+    window.location.href = `/manager/applications/${applicationId}`;
   };
 
   return (
@@ -350,6 +345,9 @@ export const DirectoryPage: React.FC = () => {
                       Application Number
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
+                      Application Name
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">
                       Customer Name
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
@@ -376,7 +374,28 @@ export const DirectoryPage: React.FC = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div className="font-medium text-gray-900">
+                          {app.applicationName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Created:{" "}
+                          {new Date(app.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="font-medium text-gray-900">
                           {app.customer.firstName} {app.customer.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          <Badge
+                            variant={
+                              app.status === "In Progress"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {app.status}
+                          </Badge>
                         </div>
                       </td>
                       <td className="py-4 px-4">
@@ -404,7 +423,7 @@ export const DirectoryPage: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewApplication(app)}
+                          onClick={() => handleViewApplication(app._id)}
                           className="flex items-center gap-2"
                         >
                           <Eye className="w-4 h-4" />
@@ -419,16 +438,6 @@ export const DirectoryPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Application Documents Modal */}
-      <ApplicationDocumentsModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedApplication(null);
-        }}
-        application={selectedApplication}
-      />
     </div>
   );
 };
