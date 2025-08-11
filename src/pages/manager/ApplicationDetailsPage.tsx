@@ -457,40 +457,56 @@ export const ApplicationDetailsPage: React.FC = () => {
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [isBulkUpdateInProgress, setIsBulkUpdateInProgress] = useState(false);
 
+  // 🎯 FIX: Add refs to prevent infinite loops
+  const isWorkflowProgressionRunning = useRef(false);
+  const isDocumentMergingRunning = useRef(false);
+
   // 🔄 MERGE DOCUMENTS: Update workflow steps with fetched application documents
   useEffect(() => {
+    // Guard against running when already in progress
+    if (isDocumentMergingRunning.current) {
+      return;
+    }
+
     if (workflowSteps.length > 0 && applicationDocuments.length > 0) {
-      setWorkflowSteps((prevSteps) => {
-        const updatedSteps = prevSteps.map((step) => {
-          // 🎯 IMPROVED DOCUMENT MATCHING: More robust matching logic
-          const stepDocuments = applicationDocuments.filter((doc) => {
-            // Normalize both step names for comparison (case-insensitive, trim whitespace)
-            const normalizedStepTitle = step.title?.toLowerCase().trim();
+      isDocumentMergingRunning.current = true;
 
-            // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
-            const docStepName = doc.stepName || doc.relatedStepName;
-            const normalizedDocStepName = docStepName?.toLowerCase().trim();
+      try {
+        setWorkflowSteps((prevSteps) => {
+          const updatedSteps = prevSteps.map((step) => {
+            // 🎯 IMPROVED DOCUMENT MATCHING: More robust matching logic
+            const stepDocuments = applicationDocuments.filter((doc) => {
+              // Normalize both step names for comparison (case-insensitive, trim whitespace)
+              const normalizedStepTitle = step.title?.toLowerCase().trim();
 
-            // Also check if the document's stepName matches the step's original stepName from the database
-            const normalizedStepName = step.stepName?.toLowerCase().trim();
+              // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
+              const docStepName = doc.stepName || doc.relatedStepName;
+              const normalizedDocStepName = docStepName?.toLowerCase().trim();
 
-            const matchesTitle = normalizedStepTitle === normalizedDocStepName;
-            const matchesStepName =
-              normalizedStepName === normalizedDocStepName;
+              // Also check if the document's stepName matches the step's original stepName from the database
+              const normalizedStepName = step.stepName?.toLowerCase().trim();
 
-            return matchesTitle || matchesStepName;
+              const matchesTitle =
+                normalizedStepTitle === normalizedDocStepName;
+              const matchesStepName =
+                normalizedStepName === normalizedDocStepName;
+
+              return matchesTitle || matchesStepName;
+            });
+
+            return {
+              ...step,
+              documents: stepDocuments,
+            };
           });
 
-          return {
-            ...step,
-            documents: stepDocuments,
-          };
+          return updatedSteps;
         });
-
-        return updatedSteps;
-      });
+      } finally {
+        isDocumentMergingRunning.current = false;
+      }
     }
-  }, [applicationDocuments, workflowSteps]); // 🎯 FIX: Use workflowSteps array directly for more reliable dependency tracking
+  }, [applicationDocuments]); // 🎯 FIX: Removed workflowSteps from dependencies to prevent infinite loop
 
   // 🚀 CONSOLIDATED WORKFLOW PROGRESSION: Single useEffect to handle complete workflow logic
   useEffect(() => {
@@ -505,10 +521,11 @@ export const ApplicationDetailsPage: React.FC = () => {
     if (
       !applicationDocuments.length ||
       !workflowSteps.length ||
-      isBulkUpdateInProgress
+      isBulkUpdateInProgress ||
+      isWorkflowProgressionRunning.current
     ) {
       console.log(
-        `🎯 Skipping workflow progression check - conditions not met`
+        `🎯 Skipping workflow progression check - conditions not met or already running`
       );
       return;
     }
@@ -516,80 +533,89 @@ export const ApplicationDetailsPage: React.FC = () => {
     console.log(`🎯 Starting workflow progression check`);
 
     const checkWorkflowProgression = async () => {
-      // We use a copy to avoid direct mutation issues
-      const currentSteps = [...workflowSteps];
+      // Set the flag to prevent multiple simultaneous executions
+      isWorkflowProgressionRunning.current = true;
 
-      for (const [index, step] of currentSteps.entries()) {
-        // Skip steps that are already approved
-        if (step.status === "approved") {
-          continue;
-        }
+      try {
+        // We use a copy to avoid direct mutation issues
+        const currentSteps = [...workflowSteps];
 
-        // 1. Check if the current step should be marked as approved
-        const stepDocuments = applicationDocuments.filter((doc) => {
-          // Use the same improved matching logic as in document merging
-          const normalizedStepTitle = step.title?.toLowerCase().trim();
+        for (const [index, step] of currentSteps.entries()) {
+          // Skip steps that are already approved
+          if (step.status === "approved") {
+            continue;
+          }
 
-          // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
-          const docStepName = doc.stepName || doc.relatedStepName;
-          const normalizedDocStepName = docStepName?.toLowerCase().trim();
+          // 1. Check if the current step should be marked as approved
+          const stepDocuments = applicationDocuments.filter((doc) => {
+            // Use the same improved matching logic as in document merging
+            const normalizedStepTitle = step.title?.toLowerCase().trim();
 
-          const normalizedStepName = step.stepName?.toLowerCase().trim();
+            // 🎯 FIX: Handle both stepName and relatedStepName fields from documents
+            const docStepName = doc.stepName || doc.relatedStepName;
+            const normalizedDocStepName = docStepName?.toLowerCase().trim();
 
-          const matchesTitle = normalizedStepTitle === normalizedDocStepName;
-          const matchesStepName = normalizedStepName === normalizedDocStepName;
+            const normalizedStepName = step.stepName?.toLowerCase().trim();
 
-          return matchesTitle || matchesStepName;
-        });
+            const matchesTitle = normalizedStepTitle === normalizedDocStepName;
+            const matchesStepName =
+              normalizedStepName === normalizedDocStepName;
 
-        if (stepDocuments.length > 0) {
-          console.log(
-            `🎯 Checking ${stepDocuments.length} documents for step "${step.title}"`
-          );
-          stepDocuments.forEach((doc) => {
-            console.log(
-              `  - Document: ${doc.documentName}, Status: "${doc.status}"`
-            );
+            return matchesTitle || matchesStepName;
           });
 
-          const allDocsApproved = stepDocuments.every((doc) => {
-            // 🎯 IMPROVED STATUS CHECK: Handle case variations in document status
-            const normalizedDocStatus = doc.status?.toLowerCase().trim();
-            const isApproved = normalizedDocStatus === "approved";
+          if (stepDocuments.length > 0) {
+            console.log(
+              `🎯 Checking ${stepDocuments.length} documents for step "${step.title}"`
+            );
+            stepDocuments.forEach((doc) => {
+              console.log(
+                `  - Document: ${doc.documentName}, Status: "${doc.status}"`
+              );
+            });
+
+            const allDocsApproved = stepDocuments.every((doc) => {
+              // 🎯 IMPROVED STATUS CHECK: Handle case variations in document status
+              const normalizedDocStatus = doc.status?.toLowerCase().trim();
+              const isApproved = normalizedDocStatus === "approved";
+
+              console.log(
+                `  - Document "${doc.documentName}": "${doc.status}" -> "${normalizedDocStatus}" -> isApproved: ${isApproved}`
+              );
+
+              return isApproved;
+            });
 
             console.log(
-              `  - Document "${doc.documentName}": "${doc.status}" -> "${normalizedDocStatus}" -> isApproved: ${isApproved}`
+              `🎯 Step "${step.title}" - allDocsApproved: ${allDocsApproved}`
             );
 
-            return isApproved;
-          });
+            if (allDocsApproved) {
+              // Update this step to 'approved' and then check for the next one
+              await updateStepStatus(step.id, "approved");
 
-          console.log(
-            `🎯 Step "${step.title}" - allDocsApproved: ${allDocsApproved}`
-          );
-
-          if (allDocsApproved) {
-            // Update this step to 'approved' and then check for the next one
-            await updateStepStatus(step.id, "approved");
-
-            // 2. Since this step is now approved, check if we can unlock the next one
-            const nextStepIndex = index + 1;
-            if (nextStepIndex < currentSteps.length) {
-              const nextStep = currentSteps[nextStepIndex];
-              if (nextStep.status === "not-started") {
-                await updateStepStatus(nextStep.id, "submitted");
+              // 2. Since this step is now approved, check if we can unlock the next one
+              const nextStepIndex = index + 1;
+              if (nextStepIndex < currentSteps.length) {
+                const nextStep = currentSteps[nextStepIndex];
+                if (nextStep.status === "not-started") {
+                  await updateStepStatus(nextStep.id, "submitted");
+                }
               }
-            }
 
-            // Once we've made an update, we can break the loop to wait for the next re-render
-            break;
+              // Once we've made an update, we can break the loop to wait for the next re-render
+              break;
+            }
           }
         }
+      } finally {
+        // Always reset the flag when done
+        isWorkflowProgressionRunning.current = false;
       }
     };
 
     checkWorkflowProgression();
-  }, [applicationDocuments, workflowSteps, isBulkUpdateInProgress]); // 🎯 FIX: Use workflowSteps array directly for more reliable dependency tracking
+  }, [applicationDocuments, isBulkUpdateInProgress]); // 🎯 FIX: Removed workflowSteps from dependencies to prevent infinite loop
 
   // 🎯 REMOVED: This useEffect hook was redundant and caused duplicate workflow progression logic
   // The main consolidated useEffect hook above handles all workflow progression automatically
