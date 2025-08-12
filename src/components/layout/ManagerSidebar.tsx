@@ -31,8 +31,8 @@ import { cn } from "@/lib/utils";
 const managerNavItems = [
   { title: "Dashboard", url: "/manager/dashboard", icon: LayoutDashboard },
   { title: "Agents", url: "/manager/agents", icon: UserCheck },
-  { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Customers", url: "/manager/customers", icon: Users },
+  { title: "Applications", url: "/manager/applications", icon: FileText },
   { title: "Documents", url: "/manager/directory", icon: FolderOpen },
   // {
   //   title: "Visa Applications",

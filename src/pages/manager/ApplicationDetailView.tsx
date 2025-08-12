@@ -33,6 +33,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText,
   Download,
@@ -48,6 +49,10 @@ import {
   X,
   Check,
   AlertCircle,
+  CreditCard,
+  Receipt,
+  MessageSquare,
+  Workflow,
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
@@ -55,6 +60,7 @@ import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import ApplicationWorkflowTimeline from "@/components/common/ApplicationWorkflowTimeline";
+import { NotesModule } from "@/components/common/NotesModule";
 
 interface Application {
   _id: string;
@@ -113,6 +119,8 @@ interface Application {
   };
 }
 
+type TabType = "details" | "workflow" | "payments" | "notes";
+
 interface ApplicationDetailViewProps {
   applicationId: string;
   onBack: () => void;
@@ -125,6 +133,8 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const initialTab: TabType = "details";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     file: null as File | null,
@@ -372,286 +382,450 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Application Summary */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Summary</CardTitle>
-              <CardDescription>
-                Key information about this application
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Application ID:
-                  </span>
-                  <span className="text-sm font-medium">{application._id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Application Number:
-                  </span>
-                  <span className="text-sm font-medium">
-                    {application.applicationNumber}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Submission Date:
-                  </span>
-                  <span className="text-sm">
-                    {formatDate(application.submissionDate)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Last Updated:
-                  </span>
-                  <span className="text-sm">
-                    {formatDate(application.lastUpdatedDate)}
-                  </span>
-                </div>
-                {application.companyJurisdiction && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Company Jurisdiction:
-                    </span>
-                    <span className="text-sm">
-                      {application.companyJurisdiction}
-                    </span>
-                  </div>
-                )}
-                {application.assignedAgent && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Assigned Agent:
-                    </span>
-                    <span className="text-sm">
-                      {application.assignedAgent.fullName}
-                    </span>
-                  </div>
-                )}
-              </div>
+      {/* Application Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Application Summary</CardTitle>
+          <CardDescription>
+            Key information about this application
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Application ID</p>
+              <p className="text-sm font-medium">{application._id}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Submission Date</p>
+              <p className="text-sm">
+                {formatDate(application.submissionDate)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Last Updated</p>
+              <p className="text-sm">
+                {formatDate(application.lastUpdatedDate)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Assigned Agent</p>
+              <p className="text-sm">
+                {application.assignedAgent?.fullName || "Not assigned"}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              {application.customer && (
-                <div className="pt-4 border-t">
-                  <h4 className="font-semibold text-sm mb-3">
-                    Customer Information
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Name:
-                      </span>
-                      <span className="text-sm">
-                        {application.customer.firstName}{" "}
-                        {application.customer.lastName}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Email:
-                      </span>
-                      <span className="text-sm">
-                        {application.customer.email}
-                      </span>
-                    </div>
-                    {application.customer.phoneNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Phone:
-                        </span>
-                        <span className="text-sm">
-                          {application.customer.phoneNumber}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* Tabs */}
+      <div className="border rounded-lg p-4 bg-white">
+        {/* Tab Navigation */}
+        <div className="grid w-full grid-cols-4 mb-6 bg-gray-100 border rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-all ${
+              activeTab === "details"
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-white border hover:bg-gray-50"
+            } border rounded`}
+          >
+            <FileText className="h-4 w-4" />
+            Application Details
+          </button>
+          <button
+            onClick={() => setActiveTab("workflow")}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-all ${
+              activeTab === "workflow"
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-white border hover:bg-gray-50"
+            } border rounded`}
+          >
+            <Workflow className="h-4 w-4" />
+            Workflow Timeline
+          </button>
+          <button
+            onClick={() => setActiveTab("payments")}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-all ${
+              activeTab === "payments"
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-white border hover:bg-gray-50"
+            } border rounded`}
+          >
+            <CreditCard className="h-4 w-4" />
+            Payment Details
+          </button>
+          <button
+            onClick={() => setActiveTab("notes")}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-all ${
+              activeTab === "notes"
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-white border hover:bg-gray-50"
+            } border rounded`}
+          >
+            <MessageSquare className="h-4 w-4" />
+            NOTES
+          </button>
         </div>
 
-        {/* Application Details */}
-        <div className="lg:col-span-2">
-          <Accordion type="single" collapsible className="space-y-4">
-            {/* Business Setup Details */}
-            <AccordionItem value="business-setup" className="border rounded-lg">
-              <AccordionTrigger className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Building className="h-5 w-5 text-blue-600" />
-                  <div className="text-left">
-                    <h3 className="font-semibold">Business Setup Details</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Company information and business details
-                    </p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                {application.businessSetup ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Application Details Tab */}
+          {activeTab === "details" && (
+            <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Customer Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-blue-600" />
+                    Customer Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {application.customer ? (
                     <div className="space-y-3">
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Company Type
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Name:
+                        </span>
+                        <span className="text-sm font-medium">
+                          {application.customer.firstName}{" "}
+                          {application.customer.lastName}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Email:
+                        </span>
+                        <span className="text-sm">
+                          {application.customer.email}
+                        </span>
+                      </div>
+                      {application.customer.phoneNumber && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Phone:
+                          </span>
+                          <span className="text-sm">
+                            {application.customer.phoneNumber}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No customer information available
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Business Setup Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building className="h-5 w-5 text-green-600" />
+                    Business Setup Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {application.businessSetup ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Company Type:
+                        </span>
+                        <span className="text-sm">
                           {application.businessSetup.companyType ||
                             "Not specified"}
-                        </p>
+                        </span>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Business Activity
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Business Activity:
+                        </span>
+                        <span className="text-sm">
                           {application.businessSetup.businessActivity ||
                             "Not specified"}
-                        </p>
+                        </span>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Proposed Name
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Proposed Name:
+                        </span>
+                        <span className="text-sm">
                           {application.businessSetup.proposedName ||
                             "Not specified"}
-                        </p>
+                        </span>
                       </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Office Type
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Office Type:
+                        </span>
+                        <span className="text-sm">
                           {application.businessSetup.officeType ||
                             "Not specified"}
-                        </p>
+                        </span>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium">
-                          Quoted Price
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Quoted Price:
+                        </span>
+                        <span className="text-sm">
                           {application.businessSetup.quotedPrice
                             ? `$${application.businessSetup.quotedPrice}`
                             : "Not specified"}
-                        </p>
+                        </span>
                       </div>
-                      {application.businessSetup.alternativeNames &&
-                        application.businessSetup.alternativeNames.length >
-                          0 && (
-                          <div>
-                            <Label className="text-sm font-medium">
-                              Alternative Names
-                            </Label>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {application.businessSetup.alternativeNames.map(
-                                (name, idx) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {name}
-                                  </Badge>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <Building className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  ) : (
                     <p className="text-sm text-muted-foreground">
                       No business setup details available
                     </p>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Investor Details */}
-            <AccordionItem value="investors" className="border rounded-lg">
-              <AccordionTrigger className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-green-600" />
-                  <div className="text-left">
-                    <h3 className="font-semibold">Investor Details</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {application.investors?.length || 0} investor(s)
-                    </p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                {application.investors && application.investors.length > 0 ? (
-                  <div className="space-y-4">
-                    {application.investors.map((investor, idx) => (
-                      <div key={idx} className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-sm mb-3">
-                          Investor {idx + 1}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <Label className="text-sm font-medium">Name</Label>
-                            <p className="text-sm text-muted-foreground">
-                              {investor.name}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium">
-                              Ownership
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              {investor.ownershipPercentage}%
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium">Role</Label>
-                            <p className="text-sm text-muted-foreground">
-                              {investor.role}
-                            </p>
+              {/* Investor Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-purple-600" />
+                    Investor Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {application.investors && application.investors.length > 0 ? (
+                    <div className="space-y-3">
+                      {application.investors.map((investor, idx) => (
+                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                          <h4 className="font-medium text-sm mb-2">
+                            Investor {idx + 1}
+                          </h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Name:
+                              </span>
+                              <span className="text-sm">{investor.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Ownership:
+                              </span>
+                              <span className="text-sm">
+                                {investor.ownershipPercentage}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Role:
+                              </span>
+                              <span className="text-sm">{investor.role}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      ))}
+                    </div>
+                  ) : (
                     <p className="text-sm text-muted-foreground">
                       No investor details available
                     </p>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Payment Details */}
-            <AccordionItem value="payments" className="border rounded-lg">
-              <AccordionTrigger className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <DollarSign className="h-5 w-5 text-yellow-600" />
-                  <div className="text-left">
-                    <h3 className="font-semibold">Payment Details</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {application.payments?.length || 0} payment(s)
-                    </p>
+              {/* Documents */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileImage className="h-5 w-5 text-orange-600" />
+                    Documents
+                  </CardTitle>
+                  <CardDescription>
+                    {application.documents?.length || 0} document(s) uploaded
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Upload Button */}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium text-sm">
+                          Upload New Document
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Max file size: 10MB
+                        </p>
+                      </div>
+                      <Dialog
+                        open={isUploadDialogOpen}
+                        onOpenChange={setIsUploadDialogOpen}
+                      >
+                        <DialogTrigger asChild>
+                          <Button size="sm">
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload Document
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Upload Document</DialogTitle>
+                            <DialogDescription>
+                              Upload a new document for this application.
+                              Maximum file size is 10MB.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="title">Document Title</Label>
+                              <Input
+                                id="title"
+                                value={uploadForm.title}
+                                onChange={(e) =>
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    title: e.target.value,
+                                  }))
+                                }
+                                placeholder="Enter document title"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="file">Select File</Label>
+                              <Input
+                                id="file"
+                                type="file"
+                                onChange={handleFileChange}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Supported formats: PDF, DOC, DOCX, JPG, JPEG,
+                                PNG
+                              </p>
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setIsUploadDialogOpen(false);
+                                setUploadForm({ title: "", file: null });
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleUpload}
+                              disabled={
+                                !uploadForm.title ||
+                                !uploadForm.file ||
+                                isUploading
+                              }
+                            >
+                              {isUploading ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Upload
+                                </>
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    {/* Documents List */}
+                    {application.documents &&
+                    application.documents.length > 0 ? (
+                      <div className="space-y-3">
+                        {application.documents.map((document, idx) => (
+                          <div
+                            key={document._id}
+                            className="p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h5 className="font-medium text-sm">
+                                  {document.name}
+                                </h5>
+                                <p className="text-sm text-muted-foreground">
+                                  Uploaded by {document.uploadedBy} on{" "}
+                                  {formatDate(document.uploadedDate)}
+                                </p>
+                                {document.fileSize && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(document.fileSize)}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline">
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleDownload(document._id, document.name)
+                                  }
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <FileImage className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          No documents uploaded yet
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Workflow Timeline Tab */}
+          {activeTab === "workflow" && (
+            <div className="space-y-6">
+              {application && application.steps && (
+                <ApplicationWorkflowTimeline
+                  applicationId={applicationId}
+                  steps={application.steps}
+                  applicationType={application.applicationType || "mainland"}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Payment Details Tab */}
+          {activeTab === "payments" && (
+            <div className="space-y-6">
+              <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-green-600" />
+                  Payment Details
+                </CardTitle>
+                <CardDescription>
+                  Track payment status and invoices for this application
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 {application.payments && application.payments.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {application.payments.map((payment, idx) => (
                       <div key={idx} className="p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center justify-between">
@@ -683,7 +857,7 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({
                             </Badge>
                             {payment.invoiceUrl && (
                               <Button size="sm" variant="outline">
-                                <Download className="h-4 w-4 mr-1" />
+                                <Receipt className="h-4 w-4 mr-1" />
                                 Download Invoice
                               </Button>
                             )}
@@ -693,188 +867,33 @@ export const ApplicationDetailView: React.FC<ApplicationDetailViewProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <DollarSign className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      No payment details available
+                  <div className="text-center py-8">
+                    <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      No Payment Records
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Payment details will appear here once payments are
+                      processed.
                     </p>
                   </div>
                 )}
-              </AccordionContent>
-            </AccordionItem>
+              </CardContent>
+            </Card>
+            </div>
+          )}
 
-            {/* Documents */}
-            <AccordionItem value="documents" className="border rounded-lg">
-              <AccordionTrigger className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <FileImage className="h-5 w-5 text-purple-600" />
-                  <div className="text-left">
-                    <h3 className="font-semibold">Documents</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {application.documents?.length || 0} document(s)
-                    </p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="space-y-4">
-                  {/* Upload Button */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium text-sm">
-                        Upload New Document
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        Max file size: 10MB
-                      </p>
-                    </div>
-                    <Dialog
-                      open={isUploadDialogOpen}
-                      onOpenChange={setIsUploadDialogOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Document
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Upload Document</DialogTitle>
-                          <DialogDescription>
-                            Upload a new document for this application. Maximum
-                            file size is 10MB.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="title">Document Title</Label>
-                            <Input
-                              id="title"
-                              value={uploadForm.title}
-                              onChange={(e) =>
-                                setUploadForm((prev) => ({
-                                  ...prev,
-                                  title: e.target.value,
-                                }))
-                              }
-                              placeholder="Enter document title"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="file">Select File</Label>
-                            <Input
-                              id="file"
-                              type="file"
-                              onChange={handleFileChange}
-                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
-                            </p>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setIsUploadDialogOpen(false);
-                              setUploadForm({ title: "", file: null });
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={handleUpload}
-                            disabled={
-                              !uploadForm.title ||
-                              !uploadForm.file ||
-                              isUploading
-                            }
-                          >
-                            {isUploading ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Uploading...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload
-                              </>
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-
-                  {/* Documents List */}
-                  {application.documents && application.documents.length > 0 ? (
-                    <div className="space-y-3">
-                      {application.documents.map((document, idx) => (
-                        <div
-                          key={document._id}
-                          className="p-4 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <h5 className="font-medium text-sm">
-                                {document.name}
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                Uploaded by {document.uploadedBy} on{" "}
-                                {formatDate(document.uploadedDate)}
-                              </p>
-                              {document.fileSize && (
-                                <p className="text-xs text-muted-foreground">
-                                  {formatFileSize(document.fileSize)}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" variant="outline">
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  handleDownload(document._id, document.name)
-                                }
-                              >
-                                <Download className="h-4 w-4 mr-1" />
-                                Download
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <FileImage className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        No documents uploaded yet
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          {/* Notes Tab */}
+          {activeTab === "notes" && (
+            <div className="space-y-6">
+              <NotesModule
+                customerId={application.customer?._id || ""}
+                applicationId={applicationId}
+              />
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Application Workflow Timeline */}
-      {application && application.steps && (
-        <ApplicationWorkflowTimeline
-          applicationId={applicationId}
-          steps={application.steps}
-          applicationType={application.applicationType || "mainland"}
-        />
-      )}
     </div>
   );
 };
