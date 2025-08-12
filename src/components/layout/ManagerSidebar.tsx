@@ -57,14 +57,10 @@ export const ManagerSidebar: React.FC = () => {
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
             <img
-              src={
-                isCollapsed
-                  ? "/sidebar-collapse-logo.png"
-                  : "/sidebar-expand-logo.png"
-              }
+              src="/lovable-uploads/logo-1.png"
               alt="Waflow Logo"
               className={`${
-                isCollapsed ? "w-12 h-12" : "w-48 h-12"
+                isCollapsed ? "w-16 h-16" : "w-64 h-20"
               } object-contain transition-all duration-300`}
             />
           </div>
