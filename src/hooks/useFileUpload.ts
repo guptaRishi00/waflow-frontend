@@ -29,6 +29,13 @@ export const useFileUpload = (
 
     setIsUploading(true);
     try {
+      // Debug: Log the application data structure
+      console.log("🔍 Document Upload Debug:", {
+        applicationId: applicationData?.applicationId,
+        _id: applicationData?._id,
+        fullApplicationData: applicationData,
+      });
+
       // Create document via backend API - let backend handle Cloudinary upload
       const formData = new FormData();
       formData.append("file", file);
@@ -36,10 +43,10 @@ export const useFileUpload = (
       formData.append("documentType", "General");
       formData.append("relatedStepName", stepName);
       formData.append("linkedModel", "Application");
+      // Send the MongoDB ObjectId as applicationId for the linkedTo field
       formData.append("applicationId", applicationData?._id || "");
-      formData.append("linkedTo", applicationData?._id || "");
-      formData.append("userId", user?._id || user?.id || "");
-      formData.append("uploadedBy", user?._id || user?.id || "");
+      formData.append("userId", user?.id || "");
+      formData.append("uploadedBy", user?.id || "");
 
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
@@ -57,10 +64,8 @@ export const useFileUpload = (
         description: "Document has been uploaded successfully",
       });
 
-      // Refresh documents data to show new document
-      if (applicationData?._id) {
-        await fetchApplicationDocuments(applicationData._id);
-      }
+      // Don't auto-refresh to avoid infinite loops
+      // The parent component should handle refreshing when needed
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||

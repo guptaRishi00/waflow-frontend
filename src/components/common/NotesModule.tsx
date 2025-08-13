@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -7,10 +7,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -18,31 +16,23 @@ import {
   Edit,
   Trash2,
   FileText,
-  Upload,
-  Bell,
-  BellOff,
   User,
   Shield,
   Calendar,
 } from "lucide-react";
-// import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import axios from "axios";
 
 interface Note {
-  id: string;
-  title: string;
-  description: string;
-  author: string;
-  authorRole: "agent" | "manager";
+  _id: string;
+  message: string;
+  addedBy: string | { _id: string; fullName: string; email: string } | null;
+  addedByRole?: string;
   createdAt: string;
   updatedAt: string;
-  notifyCustomer: boolean;
-  attachment?: {
-    name: string;
-    url: string;
-  };
+  timestamp?: string; // Backend might use timestamp instead of createdAt
   customerId: string;
 }
 
@@ -50,114 +40,131 @@ interface NotesModuleProps {
   customerId: string;
   applicationId?: string;
   className?: string;
+  applicationData?: any; // Add this to receive application data
+  onApplicationUpdate?: (updatedData: any) => void; // Add callback for parent updates
 }
 
 export const NotesModule: React.FC<NotesModuleProps> = ({
   customerId,
   applicationId,
   className = "",
+  applicationData,
+  onApplicationUpdate,
 }) => {
   const { token, user } = useSelector((state: RootState) => state.customerAuth);
   const { toast } = useToast();
 
-  // Mock data - in real app, this would be fetched from API
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: "1",
-      title: "Customer Follow-up Required",
-      description:
-        "Customer needs to provide additional bank statement from last 3 months. Missing documents for investment proof.",
-      author: "Sarah Johnson",
-      authorRole: "agent",
-      createdAt: "2024-01-15T10:30:00Z",
-      updatedAt: "2024-01-15T10:30:00Z",
-      notifyCustomer: true,
-      customerId: customerId,
-    },
-    {
-      id: "2",
-      title: "Internal Review Note",
-      description:
-        "Application looks good overall. All documents verified. Ready for approval once bank statement is provided.",
-      author: "John Manager",
-      authorRole: "manager",
-      createdAt: "2024-01-14T15:45:00Z",
-      updatedAt: "2024-01-14T15:45:00Z",
-      notifyCustomer: false,
-      customerId: customerId,
-    },
-  ]);
+  // Get notes from application data
+  useEffect(() => {
+    if (applicationData?.notes) {
+      setNotes(applicationData.notes);
+    }
+  }, [applicationData?.notes]);
+
+  const [notes, setNotes] = useState<Note[]>([]);
 
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [newNote, setNewNote] = useState({
-    title: "",
-    description: "",
-    notifyCustomer: false,
-    attachment: null as File | null,
+    message: "",
   });
 
-  const handleAddNote = () => {
-    if (!newNote.title.trim() || !newNote.description.trim()) {
+  const handleAddNote = async () => {
+    if (!newNote.message.trim() || !customerId || !token) {
       toast({
         title: "Validation Error",
-        description: "Please fill in both title and description.",
+        description: "Please fill in the note message.",
         variant: "destructive",
       });
       return;
     }
 
-    const note: Note = {
-      id: Date.now().toString(),
-      title: newNote.title,
-      description: newNote.description,
-      author: user?.name || "Unknown",
-      authorRole: user?.role === "manager" ? "manager" : "agent",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      notifyCustomer: newNote.notifyCustomer,
-      customerId: customerId,
-      attachment: newNote.attachment
-        ? {
-            name: newNote.attachment.name,
-            url: URL.createObjectURL(newNote.attachment),
-          }
-        : undefined,
-    };
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/application/note/${customerId}`,
+        {
+          message: newNote.message,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-    setNotes([note, ...notes]);
-    setNewNote({
-      title: "",
-      description: "",
-      notifyCustomer: false,
-      attachment: null,
-    });
-    setIsAddingNote(false);
+      // The backend returns { message: "Note added successfully", notes: application.notes }
+      if (response.data.message && response.data.notes) {
+        console.log("Backend response:", response.data);
+        console.log("Updating notes with:", response.data.notes);
 
-    toast({
-      title: "Note Added",
-      description: newNote.notifyCustomer
-        ? "Note added and customer will be notified."
-        : "Internal note added successfully.",
-    });
+        toast({
+          title: "Note Added",
+          description: response.data.message,
+        });
+
+        // Update notes from the backend response for real-time updates
+        // Ensure the new note appears at the top by sorting by creation date
+        const sortedNotes = response.data.notes.sort((a: Note, b: Note) => {
+          const dateA = new Date(a.createdAt || a.timestamp || 0);
+          const dateB = new Date(b.createdAt || b.timestamp || 0);
+          return dateB.getTime() - dateA.getTime(); // Newest first
+        });
+
+        // If the new note isn't in the backend response, add it manually at the top
+        const newNoteExists = sortedNotes.some(
+          (note) => note.message === newNote.message
+        );
+        if (!newNoteExists) {
+          const newNoteObj = {
+            _id: response.data.note?._id || Date.now().toString(),
+            message: newNote.message,
+            addedBy: user?.name || "Unknown",
+            addedByRole: user?.role,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            customerId: customerId,
+          };
+          sortedNotes.unshift(newNoteObj); // Add to the beginning
+        }
+
+        setNotes(sortedNotes);
+
+        setNewNote({ message: "" });
+        setIsAddingNote(false);
+
+        // Call the callback to refresh parent data for real-time updates
+        if (onApplicationUpdate) {
+          console.log("Calling onApplicationUpdate callback");
+          // Pass the updated notes to trigger parent refresh
+          await onApplicationUpdate(response.data.notes);
+        }
+      } else {
+        console.log("Unexpected backend response:", response.data);
+      }
+    } catch (error: any) {
+      console.error("Error adding note:", error);
+      toast({
+        title: "Error adding note",
+        description: error.response?.data?.message || "Failed to add note",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteNote = (noteId: string) => {
-    setNotes(notes.filter((note) => note.id !== noteId));
+    // Remove from local state only (backend delete endpoint was removed)
+    setNotes(notes.filter((note) => note._id !== noteId));
     toast({
-      title: "Note Deleted",
-      description: "Note has been removed successfully.",
+      title: "Note Removed",
+      description: "Note has been removed from view.",
     });
   };
 
   const handleEditNote = (noteId: string) => {
-    const note = notes.find((n) => n.id === noteId);
+    const note = notes.find((n) => n._id === noteId);
     if (note) {
       setNewNote({
-        title: note.title,
-        description: note.description,
-        notifyCustomer: note.notifyCustomer,
-        attachment: null,
+        message: note.message,
       });
       setEditingNote(noteId);
       setIsAddingNote(true);
@@ -169,24 +176,17 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
 
     setNotes(
       notes.map((note) =>
-        note.id === editingNote
+        note._id === editingNote
           ? {
               ...note,
-              title: newNote.title,
-              description: newNote.description,
-              notifyCustomer: newNote.notifyCustomer,
+              message: newNote.message,
               updatedAt: new Date().toISOString(),
             }
           : note
       )
     );
 
-    setNewNote({
-      title: "",
-      description: "",
-      notifyCustomer: false,
-      attachment: null,
-    });
+    setNewNote({ message: "" });
     setIsAddingNote(false);
     setEditingNote(null);
 
@@ -197,7 +197,14 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
   };
 
   const canEditNote = (note: Note) => {
-    return user?.name === note.author;
+    if (
+      typeof note.addedBy === "object" &&
+      note.addedBy &&
+      "fullName" in note.addedBy
+    ) {
+      return user?.name === note.addedBy.fullName;
+    }
+    return user?.name === note.addedBy;
   };
 
   const formatDate = (dateString: string) => {
@@ -237,69 +244,17 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
         {isAddingNote && (
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="note-title">Note Title</Label>
-              <Input
-                id="note-title"
-                value={newNote.title}
-                onChange={(e) =>
-                  setNewNote({ ...newNote, title: e.target.value })
-                }
-                placeholder="Enter a brief title for this note..."
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="note-description">Description</Label>
+              <Label htmlFor="note-message">Note Message</Label>
               <Textarea
-                id="note-description"
-                value={newNote.description}
+                id="note-message"
+                value={newNote.message}
                 onChange={(e) =>
-                  setNewNote({ ...newNote, description: e.target.value })
+                  setNewNote({ ...newNote, message: e.target.value })
                 }
-                placeholder="Enter detailed note content..."
+                placeholder="Enter your note message..."
                 rows={4}
                 className="mt-1"
               />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="notify-customer"
-                checked={newNote.notifyCustomer}
-                onCheckedChange={(checked) =>
-                  setNewNote({ ...newNote, notifyCustomer: checked })
-                }
-              />
-              <Label
-                htmlFor="notify-customer"
-                className="flex items-center gap-2"
-              >
-                {newNote.notifyCustomer ? (
-                  <Bell className="h-4 w-4 text-blue-600" />
-                ) : (
-                  <BellOff className="h-4 w-4 text-gray-400" />
-                )}
-                Notify Customer
-              </Label>
-            </div>
-
-            <div>
-              <Label htmlFor="note-attachment">Attachment (Optional)</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input
-                  id="note-attachment"
-                  type="file"
-                  onChange={(e) =>
-                    setNewNote({
-                      ...newNote,
-                      attachment: e.target.files?.[0] || null,
-                    })
-                  }
-                  className="flex-1"
-                />
-                <Upload className="h-4 w-4 text-gray-400" />
-              </div>
             </div>
 
             <div className="flex gap-2">
@@ -314,12 +269,7 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
                 onClick={() => {
                   setIsAddingNote(false);
                   setEditingNote(null);
-                  setNewNote({
-                    title: "",
-                    description: "",
-                    notifyCustomer: false,
-                    attachment: null,
-                  });
+                  setNewNote({ message: "" });
                 }}
               >
                 Cancel
@@ -348,31 +298,27 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
         ) : (
           <div className="space-y-3">
             {notes.map((note) => (
-              <Card key={note.id} className="relative">
+              <Card key={note._id} className="relative">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
-                        {note.authorRole === "manager" ? (
+                        {note.addedByRole === "manager" ? (
                           <Shield className="h-4 w-4 text-primary" />
                         ) : (
                           <User className="h-4 w-4 text-secondary" />
                         )}
-                        <span className="font-medium">{note.author}</span>
+                        <span className="font-medium">
+                          {typeof note.addedBy === "object" &&
+                          note.addedBy &&
+                          "fullName" in note.addedBy
+                            ? note.addedBy.fullName
+                            : (note.addedBy as string) || "Unknown"}
+                        </span>
                         <Badge variant="outline" className="text-xs">
-                          {note.authorRole}
+                          {note.addedByRole || "agent"}
                         </Badge>
                       </div>
-
-                      {note.notifyCustomer && (
-                        <Badge
-                          variant="outline"
-                          className="bg-blue-50 text-blue-700 border-blue-200"
-                        >
-                          <Bell className="h-3 w-3 mr-1" />
-                          Customer Notified
-                        </Badge>
-                      )}
                     </div>
 
                     {canEditNote(note) && (
@@ -380,14 +326,14 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleEditNote(note.id)}
+                          onClick={() => handleEditNote(note._id)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDeleteNote(note.id)}
+                          onClick={() => handleDeleteNote(note._id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -397,22 +343,9 @@ export const NotesModule: React.FC<NotesModuleProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="font-medium text-gray-900">{note.title}</h4>
                     <p className="text-gray-700 text-sm leading-relaxed">
-                      {note.description}
+                      {note.message}
                     </p>
-
-                    {note.attachment && (
-                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                        <FileText className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-700">
-                          {note.attachment.name}
-                        </span>
-                        <Button size="sm" variant="ghost" className="ml-auto">
-                          Download
-                        </Button>
-                      </div>
-                    )}
                   </div>
 
                   <Separator className="my-3" />

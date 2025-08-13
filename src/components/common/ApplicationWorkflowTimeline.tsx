@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   CheckCircle,
   Clock,
@@ -21,6 +20,7 @@ import {
   MessageSquare,
   History,
   User,
+  ChevronDown,
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
@@ -354,149 +354,162 @@ export const ApplicationWorkflowTimeline: React.FC<
         </Badge>
       </div>
 
-      <div className="grid gap-6">
+      <div className="space-y-4">
         {workflowStepNames.map((stepName, index) => {
           const stepStatus = getStepStatus(stepName);
           const stepUpdateDate = getStepUpdateDate(stepName);
           const stepDocuments = getDocumentsForStep(stepName);
 
           return (
-            <Card key={index} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(stepStatus)}
+            <Accordion key={index} type="single" collapsible className="w-full">
+              <AccordionItem
+                value={`step-${index}`}
+                className="border rounded-lg"
+              >
+                <AccordionTrigger className="px-6 py-4 hover:no-underline bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(stepStatus)}
+                      <div className="text-left">
+                        <div className="text-lg font-semibold">
+                          Step {index + 1}: {stepName}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {stepUpdateDate &&
+                            `Last updated: ${formatDate(stepUpdateDate)}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {getStatusBadge(stepStatus)}
+                    </div>
+                  </div>
+                </AccordionTrigger>
+
+                <AccordionContent className="px-6 pb-6">
+                  <div className="space-y-6">
+                    {/* Documents Section */}
                     <div>
-                      <CardTitle className="text-lg">
-                        Step {index + 1}: {stepName}
-                      </CardTitle>
-                      <CardDescription>
-                        {stepUpdateDate &&
-                          `Last updated: ${formatDate(stepUpdateDate)}`}
-                      </CardDescription>
+                      <h4 className="font-medium text-sm text-muted-foreground mb-3">
+                        Documents 1111
+                      </h4>
+
+                      {/* Drop Zone */}
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                        <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-sm text-gray-600 mb-4">
+                          Upload documents for this step
+                        </p>
+
+                        {/* Simple file input */}
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="file"
+                            onChange={(e) => handleFileInputChange(e, stepName)}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            disabled={isUploading}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Documents List */}
+                      {stepDocuments.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          {stepDocuments.map((document) => (
+                            <div
+                              key={document._id}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <span className="font-medium text-sm">
+                                  {document.documentName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    document.status === "Approved"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : document.status === "Rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }
+                                >
+                                  {document.status === "Approved"
+                                    ? "Verified"
+                                    : document.status}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    window.open(document.fileUrl, "_blank")
+                                  }
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleDownload(
+                                      document._id,
+                                      document.documentName
+                                    )
+                                  }
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(stepStatus)}
-                  </div>
-                </div>
-              </CardHeader>
 
-              <CardContent className="space-y-6">
-                {/* Documents Section */}
-                <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-3">
-                    Documents
-                  </h4>
-
-                  {/* Drop Zone */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
-                    <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-sm text-gray-600 mb-4">
-                      Upload documents for this step
-                    </p>
-
-                    {/* Simple file input */}
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="file"
-                        onChange={(e) => handleFileInputChange(e, stepName)}
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        disabled={isUploading}
-                      />
+                    {/* Notes Section */}
+                    <div>
+                      <h4 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Notes
+                      </h4>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">
+                          No notes added yet
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Documents List */}
-                  {stepDocuments.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      {stepDocuments.map((document) => (
-                        <div
-                          key={document._id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium text-sm">
-                              {document.documentName}
+                    {/* Change History Section */}
+                    <div>
+                      <h4 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Change History
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm font-medium">
+                              Agent Smith
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              Status updated to not-started
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className={
-                                document.status === "Approved"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : document.status === "Rejected"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-yellow-100 text-yellow-800"
-                              }
-                            >
-                              {document.status === "Approved"
-                                ? "Verified"
-                                : document.status}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                window.open(document.fileUrl, "_blank")
-                              }
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handleDownload(
-                                  document._id,
-                                  document.documentName
-                                )
-                              }
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <span className="text-xs text-gray-500">
+                            2 hours ago
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Notes Section */}
-                <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Notes
-                  </h4>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500">No notes added yet</p>
-                  </div>
-                </div>
-
-                {/* Change History Section */}
-                <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Change History
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium">Agent Smith</span>
-                        <span className="text-sm text-gray-600">
-                          Status updated to not-started
-                        </span>
                       </div>
-                      <span className="text-xs text-gray-500">2 hours ago</span>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           );
         })}
       </div>

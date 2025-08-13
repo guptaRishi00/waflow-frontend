@@ -284,20 +284,217 @@ export const CustomerInfoForm: React.FC<ApplicationInfoFormProps> = ({
   setApplicationDetails,
   applicationId,
 }) => {
+  // Customer data is directly in applicationDetails, not nested under customer
+  const customerData = applicationDetails || {};
+
+  // Create a function to update customer data
+  const updateCustomerData = (field: string, value: any) => {
+    console.log("Updating field:", field, "with value:", value);
+    setApplicationDetails((prev) => {
+      const updated = {
+        ...prev,
+        [field]: value,
+      };
+      console.log("Updated data:", updated);
+      return updated;
+    });
+  };
+
+  // Debug logging
+  console.log("CustomerInfoForm received:", {
+    applicationDetails,
+    customerData,
+  });
+
   return (
     <div className="space-y-4">
       <div>
         <Label>Customer Name</Label>
         <Input
-          value={applicationDetails.customerName}
-          onChange={(e) =>
-            setApplicationDetails((prev) => ({
-              ...prev,
-              customerName: e.target.value,
-            }))
+          value={
+            (customerData?.firstName || "") +
+            " " +
+            (customerData?.lastName || "")
           }
+          onChange={(e) => {
+            const names = e.target.value.split(" ");
+            const firstName = names[0] || "";
+            const lastName = names.slice(1).join(" ") || "";
+            updateCustomerData("firstName", firstName);
+            updateCustomerData("lastName", lastName);
+          }}
+          className="mt-1"
+          placeholder="Enter full name"
+        />
+      </div>
+
+      <div>
+        <Label>Email</Label>
+        <Input
+          value={customerData.email || ""}
+          disabled
+          className="mt-1 bg-gray-50 cursor-not-allowed"
+        />
+        <p className="text-xs text-gray-500 mt-1">Email cannot be edited</p>
+      </div>
+
+      <div>
+        <Label>Phone Number</Label>
+        <Input
+          value={customerData?.phoneNumber || ""}
+          onChange={(e) => updateCustomerData("phoneNumber", e.target.value)}
+          className="mt-1"
+          placeholder="Enter phone number"
+        />
+      </div>
+
+      <div>
+        <Label>Nationality</Label>
+        <Input
+          value={customerData?.nationality || ""}
+          onChange={(e) => updateCustomerData("nationality", e.target.value)}
+          className="mt-1"
+          placeholder="Enter nationality"
+        />
+      </div>
+
+      <div>
+        <Label>Date of Birth</Label>
+        <Input
+          type="date"
+          value={
+            customerData?.dob
+              ? new Date(customerData.dob).toISOString().split("T")[0]
+              : ""
+          }
+          onChange={(e) => updateCustomerData("dob", e.target.value)}
           className="mt-1"
         />
+      </div>
+
+      <div>
+        <Label>Gender</Label>
+        <Select
+          value={customerData?.gender || ""}
+          onValueChange={(value) => updateCustomerData("gender", value)}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select gender" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="male">Male</SelectItem>
+            <SelectItem value="female">Female</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>Passport Number</Label>
+        <Input
+          value={customerData?.passportNumber || ""}
+          onChange={(e) => updateCustomerData("passportNumber", e.target.value)}
+          className="mt-1"
+          placeholder="Enter passport number"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-base font-medium">Address</Label>
+
+        <div>
+          <Label className="text-sm">Address Line 1</Label>
+          <Input
+            value={customerData?.address?.line1 || ""}
+            onChange={(e) =>
+              updateCustomerData("address", {
+                ...(customerData?.address || {}),
+                line1: e.target.value,
+              })
+            }
+            className="mt-1"
+            placeholder="Enter address line 1"
+          />
+        </div>
+
+        <div>
+          <Label className="text-sm">Address Line 2</Label>
+          <Input
+            value={customerData?.address?.line2 || ""}
+            onChange={(e) =>
+              updateCustomerData("address", {
+                ...(customerData?.address || {}),
+                line2: e.target.value,
+              })
+            }
+            className="mt-1"
+            placeholder="Enter address line 2 (optional)"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm">City</Label>
+            <Input
+              value={customerData?.address?.city || ""}
+              onChange={(e) =>
+                updateCustomerData("address", {
+                  ...(customerData?.address || {}),
+                  city: e.target.value,
+                })
+              }
+              className="mt-1"
+              placeholder="Enter city"
+            />
+          </div>
+
+          <div>
+            <Label className="text-sm">State/Province</Label>
+            <Input
+              value={customerData?.address?.state || ""}
+              onChange={(e) =>
+                updateCustomerData("address", {
+                  ...(customerData?.address || {}),
+                  state: e.target.value,
+                })
+              }
+              className="mt-1"
+              placeholder="Enter state/province"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm">Country</Label>
+            <Input
+              value={customerData?.address?.country || ""}
+              onChange={(e) =>
+                updateCustomerData("address", {
+                  ...(customerData?.address || {}),
+                  country: e.target.value,
+                })
+              }
+              className="mt-1"
+              placeholder="Enter country"
+            />
+          </div>
+
+          <div>
+            <Label className="text-sm">ZIP/Postal Code</Label>
+            <Input
+              value={customerData?.address?.zipcode || ""}
+              onChange={(e) =>
+                updateCustomerData("address", {
+                  ...(customerData?.address || {}),
+                  zipcode: e.target.value,
+                })
+              }
+              className="mt-1"
+              placeholder="Enter ZIP/postal code"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -361,35 +558,38 @@ export const CompanyInfoForm: React.FC<ApplicationInfoFormProps> = ({
         </Select>
       </div>
 
-      <div>
-        <Label>Office Type</Label>
-        <Select
-          value={applicationDetails.officeType}
-          onValueChange={(value) =>
-            setApplicationDetails((prev) => ({ ...prev, officeType: value }))
-          }
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Flexi Desk">Flexi Desk</SelectItem>
-            <SelectItem value="Smart Office">Smart Office</SelectItem>
-            <SelectItem value="Executive Office">Executive Office</SelectItem>
-            <SelectItem value="Virtual Office">Virtual Office</SelectItem>
-            <SelectItem value="Warehouse">Warehouse</SelectItem>
-            <SelectItem value="Retail Shop / Showroom">
-              Retail Shop / Showroom
-            </SelectItem>
-            <SelectItem value="Business Centre Office">
-              Business Centre Office
-            </SelectItem>
-            <SelectItem value="Shared Office / Co-working Space">
-              Shared Office / Co-working Space
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Only show Office Type if Office Requirement is Required */}
+      {applicationDetails.officeRequirement === "Required" && (
+        <div>
+          <Label>Office Type</Label>
+          <Select
+            value={applicationDetails.officeType}
+            onValueChange={(value) =>
+              setApplicationDetails((prev) => ({ ...prev, officeType: value }))
+            }
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Flexi Desk">Flexi Desk</SelectItem>
+              <SelectItem value="Smart Office">Smart Office</SelectItem>
+              <SelectItem value="Executive Office">Executive Office</SelectItem>
+              <SelectItem value="Virtual Office">Virtual Office</SelectItem>
+              <SelectItem value="Warehouse">Warehouse</SelectItem>
+              <SelectItem value="Retail Shop / Showroom">
+                Retail Shop / Showroom
+              </SelectItem>
+              <SelectItem value="Business Centre Office">
+                Business Centre Office
+              </SelectItem>
+              <SelectItem value="Shared Office / Co-working Space">
+                Shared Office / Co-working Space
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 };
@@ -397,7 +597,12 @@ export const CompanyInfoForm: React.FC<ApplicationInfoFormProps> = ({
 export const ShareholderInfoForm: React.FC<ApplicationInfoFormProps> = ({
   applicationDetails,
   setApplicationDetails,
+  applicationId,
+  customerId,
 }) => {
+  // Debug logging
+  console.log("ShareholderInfoForm received:", { applicationId, customerId });
+  console.log("ShareholderInfoForm applicationDetails:", applicationDetails);
   const addShareholder = () => {
     const newShareholder = {
       name: "",
@@ -587,10 +792,29 @@ export const ShareholderInfoForm: React.FC<ApplicationInfoFormProps> = ({
 
             <div>
               <Label className="text-sm">Passport Copy</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded p-3 text-center mt-1">
-                <Upload className="h-6 w-6 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Upload passport copy</p>
-              </div>
+              <ReceiptUpload
+                existingReceipt={shareholder.passportCopy}
+                applicationId={applicationId}
+                customerId={customerId}
+                onReceiptChange={(file, existingUrl) => {
+                  const updated = [...applicationDetails.shareholders];
+                  if (file) {
+                    // Handle new file upload
+                    updated[index].passportCopy = file.name; // For now, just store filename
+                  } else if (existingUrl !== undefined) {
+                    // Handle existing URL removal or new URL
+                    updated[index].passportCopy = existingUrl;
+                  }
+                  setApplicationDetails((prev) => ({
+                    ...prev,
+                    shareholders: updated,
+                  }));
+                }}
+                documentType="Passport"
+                documentNamePrefix="Passport"
+                linkedModel="Customer"
+                relatedStepName="KYC & Background Check"
+              />
             </div>
           </div>
         )
@@ -605,7 +829,20 @@ const ReceiptUpload: React.FC<{
   onReceiptChange: (file: File | null, existingUrl?: string | null) => void;
   applicationId?: string;
   customerId?: string;
-}> = ({ existingReceipt, onReceiptChange, applicationId, customerId }) => {
+  documentType?: string;
+  documentNamePrefix?: string;
+  linkedModel?: string;
+  relatedStepName?: string;
+}> = ({
+  existingReceipt,
+  onReceiptChange,
+  applicationId,
+  customerId,
+  documentType = "Receipt",
+  documentNamePrefix = "Receipt",
+  linkedModel = "Customer",
+  relatedStepName = "Payment & License Issuance",
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -619,6 +856,14 @@ const ReceiptUpload: React.FC<{
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Debug logging
+    console.log("ReceiptUpload handleFileSelect:", {
+      applicationId,
+      customerId,
+      token: !!token,
+      file: file.name,
+    });
 
     // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
@@ -656,16 +901,37 @@ const ReceiptUpload: React.FC<{
     }
 
     // Upload file to backend
+    console.log("Upload condition check:", {
+      applicationId,
+      customerId,
+      token: !!token,
+    });
     if (applicationId && customerId && token) {
       setIsUploading(true);
       try {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("documentName", `Receipt - ${file.name}`);
-        formData.append("documentType", "Receipt");
+        formData.append("documentName", `${documentNamePrefix} - ${file.name}`);
+        formData.append("documentType", documentType);
         formData.append("linkedTo", customerId);
-        formData.append("linkedModel", "Customer");
-        formData.append("relatedStepName", "Payment & License Issuance");
+        formData.append("linkedModel", linkedModel);
+        formData.append("relatedStepName", relatedStepName);
+
+        // Debug: Log the FormData contents
+        console.log("FormData contents:");
+        for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+        }
+        console.log("customerId being sent:", customerId);
+
+        console.log(
+          "Making request to:",
+          `${import.meta.env.VITE_BASE_URL}/api/document/create-document`
+        );
+        console.log("Request headers:", {
+          Authorization: `Bearer ${token ? "TOKEN_PRESENT" : "NO_TOKEN"}`,
+          "Content-Type": "multipart/form-data",
+        });
 
         const response = await axios.post(
           `${import.meta.env.VITE_BASE_URL}/api/document/create-document`,
@@ -682,14 +948,15 @@ const ReceiptUpload: React.FC<{
         onReceiptChange(null, uploadedUrl);
 
         toast({
-          title: "Receipt Uploaded",
-          description: "Receipt has been uploaded successfully!",
+          title: `${documentType} Uploaded`,
+          description: `${documentType} has been uploaded successfully!`,
         });
       } catch (error: any) {
         toast({
           title: "Upload Failed",
           description:
-            error?.response?.data?.message || "Failed to upload receipt",
+            error?.response?.data?.message ||
+            `Failed to upload ${documentType.toLowerCase()}`,
           variant: "destructive",
         });
         // Reset file selection on error
@@ -731,12 +998,12 @@ const ReceiptUpload: React.FC<{
 
   const getFileName = (url: string) => {
     const parts = url.split("/");
-    return parts[parts.length - 1] || "Receipt";
+    return parts[parts.length - 1] || documentType;
   };
 
   return (
     <div className="space-y-2">
-      {/* Show existing receipt if available */}
+      {/* Show existing document if available */}
       {existingReceipt && !selectedFile && (
         <div className="border rounded-lg p-3 bg-green-50">
           <div className="flex items-center justify-between">
@@ -744,7 +1011,7 @@ const ReceiptUpload: React.FC<{
               {getFileIcon(getFileName(existingReceipt))}
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  Existing Receipt
+                  Existing {documentType}
                 </p>
                 <p className="text-xs text-gray-500">
                   {getFileName(existingReceipt)}
@@ -792,7 +1059,7 @@ const ReceiptUpload: React.FC<{
             disabled={isUploading}
           >
             <Upload className="w-4 h-4 mr-2" />
-            {isUploading ? "Uploading..." : "Upload Receipt"}
+            {isUploading ? "Uploading..." : `Upload ${documentType}`}
           </Button>
           <p className="text-xs text-gray-500 mt-1">Max 5MB • JPG, PNG, PDF</p>
         </div>

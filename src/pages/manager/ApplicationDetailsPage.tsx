@@ -152,7 +152,10 @@ export const ApplicationDetailsPage: React.FC = () => {
 
           {/* Payment Details Tab */}
           <TabsContent value="payments" className="space-y-6">
-            <PaymentDetails applicationData={applicationData} />
+            <PaymentDetails
+              applicationData={applicationData}
+              onApplicationUpdate={fetchApplication}
+            />
           </TabsContent>
 
           {/* Notes Tab */}
@@ -161,6 +164,8 @@ export const ApplicationDetailsPage: React.FC = () => {
               <NotesModule
                 customerId={applicationData?.customer?._id || ""}
                 applicationId={applicationData?._id || ""}
+                applicationData={applicationData}
+                onApplicationUpdate={fetchApplication}
               />
             </div>
           </TabsContent>

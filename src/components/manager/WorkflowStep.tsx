@@ -1,10 +1,15 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Select,
   SelectContent,
@@ -37,6 +42,9 @@ import {
   Banknote,
   Building,
   ClipboardCheck,
+  MessageSquare,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   WorkflowStep as WorkflowStepType,
@@ -44,6 +52,23 @@ import {
 } from "@/types/application";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { ApiApplicationData } from "@/types/application";
+import axios from "axios";
+import { useToast } from "@/hooks/use-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
+
+interface Note {
+  _id?: string;
+  message: string;
+  addedBy: {
+    fullName?: string;
+    email?: string;
+  };
+  addedByRole: string;
+  timestamp: string;
+  stepId?: string;
+  stepName?: string;
+}
 
 interface WorkflowStepProps {
   step: WorkflowStepType;
@@ -69,7 +94,7 @@ interface WorkflowStepProps {
   userRole?: string;
 }
 
-export const WorkflowStep: React.FC<WorkflowStepProps> = ({
+const WorkflowStep: React.FC<WorkflowStepProps> = ({
   step,
   stepIndex,
   workflowSteps,
@@ -81,10 +106,211 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
   fetchApplicationDocuments,
   userRole,
 }) => {
+  // Debug: Log the application data structure
+  console.log("🔍 WorkflowStep Debug - applicationData:", {
+    applicationId: applicationData?.applicationId,
+    _id: applicationData?._id,
+    customerId: applicationData?.customer?._id,
+    fullApplicationData: applicationData,
+  });
   const { isUploading, handleFileInputChange } = useFileUpload(
     applicationData,
     fetchApplicationDocuments
   );
+  const { toast } = useToast();
+  const { token } = useSelector((state: RootState) => state.customerAuth);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+
+  // Load notes for this step - only once when component mounts
+  useEffect(() => {
+    if (applicationData?.applicationId && token) {
+      loadNotes();
+    }
+  }, [applicationData?.applicationId, token]); // Remove loadNotes from dependency
+
+  const loadNotes = async () => {
+    if (!applicationData?.applicationId || !token) return;
+
+    setIsLoadingNotes(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/api/application/${
+          applicationData.applicationId
+        }`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success && response.data.data.notes) {
+        setNotes(response.data.data.notes);
+      }
+    } catch (error) {
+      console.error("Error loading notes:", error);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  const addNote = async () => {
+    if (!newNote.trim() || !applicationData?.customer?._id || !token) return;
+
+    setIsAddingNote(true);
+    try {
+      const backendStepName = getBackendStepName(step.title);
+      console.log("📝 Note Creation Debug:", {
+        message: newNote,
+        stepId: step.id,
+        frontendTitle: step.title,
+        backendStepName,
+        customerId: applicationData.customer._id,
+        token: token ? "Present" : "Missing",
+      });
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/api/application/note/${
+          applicationData.customer._id
+        }`,
+        {
+          message: newNote,
+          stepId: step.id,
+          stepName: backendStepName,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.message === "Note added successfully") {
+        setNewNote("");
+        // Add the new note to local state instead of reloading
+        const newNoteObj = {
+          _id: Date.now().toString(), // Temporary ID
+          message: newNote,
+          addedBy: { fullName: "You" },
+          addedByRole: userRole || "user",
+          timestamp: new Date().toISOString(),
+        };
+        setNotes((prev) => [newNoteObj, ...prev]);
+        toast({
+          title: "Note added successfully",
+          description: "Your note has been added to this step",
+        });
+      }
+    } catch (error) {
+      console.error("Error adding note:", error);
+      toast({
+        title: "Error adding note",
+        description: "Failed to add note. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
+  const deleteNote = async (noteId: string) => {
+    if (!applicationData?.customer?._id) return;
+
+    try {
+      // Since there's no delete endpoint, we'll just remove from local state
+      setNotes(notes.filter((note) => note._id !== noteId));
+      toast({
+        title: "Note removed",
+        description: "Note has been removed from view",
+      });
+    } catch (error) {
+      console.error("Error removing note:", error);
+      toast({
+        title: "Error removing note",
+        description: "Failed to remove note. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Map frontend step titles to backend workflow step names
+  const getBackendStepName = (frontendTitle: string): string => {
+    // Common step name mappings
+    const stepMapping: { [key: string]: string } = {
+      // Mainland and Freezone steps
+      "KYC & Background Check": "KYC & Background Check",
+      "Business Activity Selection": "Business Activity Selection",
+      "Trade Name Reservation": "Trade Name Reservation",
+      "Legal Structure Confirmation": "Legal Structure Confirmation",
+      "Initial Approval / Pre-Approval": "Initial Approval / Pre-Approval",
+      "MoA Drafting & Signature": "MoA Drafting & Signature",
+      "Office Lease / Flexi Desk": "Office Lease / Flexi Desk",
+      "Payment & License Issuance": "Payment & License Issuance",
+      "Establishment Card": "Establishment Card",
+      "Visa Allocation Request": "Visa Allocation Request",
+      "Visa Application": "Visa Application",
+      "Medical & Emirates ID": "Medical & Emirates ID",
+      "Corporate Tax Registration": "Corporate Tax Registration",
+      "VAT Registration": "VAT Registration",
+      "Bank Account Setup": "Bank Account Setup",
+      "Chamber of Commerce Registration": "Chamber of Commerce Registration",
+      "Registered Agent Appointment": "Registered Agent Appointment",
+
+      // Alternative names that might be used
+      KYC: "KYC & Background Check",
+      "Background Check": "KYC & Background Check",
+      "Business Activity": "Business Activity Selection",
+      "Trade Name": "Trade Name Reservation",
+      "Legal Structure": "Legal Structure Confirmation",
+      "Initial Approval": "Initial Approval / Pre-Approval",
+      "Pre-Approval": "Initial Approval / Pre-Approval",
+      MoA: "MoA Drafting & Signature",
+      "Office Lease": "Office Lease / Flexi Desk",
+      "Flexi Desk": "Office Lease / Flexi Desk",
+      Payment: "Payment & License Issuance",
+      "License Issuance": "Payment & License Issuance",
+      Establishment: "Establishment Card",
+      Visa: "Visa Application",
+      Medical: "Medical & Emirates ID",
+      "Emirates ID": "Medical & Emirates ID",
+      "Corporate Tax": "Corporate Tax Registration",
+      VAT: "VAT Registration",
+      "Bank Account": "Bank Account Setup",
+      Chamber: "Chamber of Commerce Registration",
+    };
+
+    // First try exact match
+    if (stepMapping[frontendTitle]) {
+      return stepMapping[frontendTitle];
+    }
+
+    // Then try partial match
+    for (const [key, value] of Object.entries(stepMapping)) {
+      if (
+        frontendTitle.toLowerCase().includes(key.toLowerCase()) ||
+        key.toLowerCase().includes(frontendTitle.toLowerCase())
+      ) {
+        return value;
+      }
+    }
+
+    // If no match found, return the original title
+    console.warn(`No step name mapping found for: ${frontendTitle}`);
+    return frontendTitle;
+  };
 
   const getStepState = (stepIndex: number) => {
     const step = workflowSteps[stepIndex];
@@ -168,34 +394,16 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
   };
 
   return (
-    <div className={`relative ${stepIndex > 0 ? "" : ""}`}>
-      {/* Timeline connector */}
-      {stepIndex < workflowSteps.length - 1 && (
-        <div
-          className={`absolute left-6 top-16 w-0.5 h-12 ${
-            step.status === "approved"
-              ? "bg-green-300"
-              : step.status === "declined"
-              ? "bg-red-300"
-              : step.status === "awaiting"
-              ? "bg-amber-300"
-              : step.status === "submitted"
-              ? "bg-blue-300"
-              : step.status === "not-started"
-              ? "bg-slate-300"
-              : "bg-gray-300"
-          }`}
-        ></div>
-      )}
-
-      <Card
-        className={`border-l-4 relative ${
+    <Accordion type="single" collapsible className="w-full">
+      <AccordionItem
+        value={`step-${stepIndex}`}
+        className={`relative border rounded-lg shadow-sm overflow-hidden ${
           step.status === "approved"
             ? "border-l-green-500 bg-green-50"
             : step.status === "declined"
             ? "border-l-red-500 bg-red-50"
             : step.status === "awaiting"
-            ? "border-l-yellow-500 bg-yellow-50"
+            ? "border-l-amber-500 bg-amber-50"
             : step.status === "submitted"
             ? "border-l-blue-500 bg-blue-50"
             : step.status === "not-started"
@@ -209,7 +417,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
       >
         {/* Status Indicator Banner */}
         <div
-          className={`absolute top-0 right-0 px-3 py-1 rounded-bl-lg text-xs font-medium text-white shadow-sm ${
+          className={`absolute top-0 right-0 px-3 py-1 rounded-bl-lg text-xs font-medium text-white shadow-sm z-10 ${
             step.status === "approved"
               ? "bg-green-600 border-b border-l border-green-700"
               : step.status === "declined"
@@ -229,7 +437,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
         {/* Sync Status Indicator */}
         {step.syncStatus && step.syncStatus !== "synced" && (
           <div
-            className={`absolute top-0 left-0 px-2 py-1 rounded-br-lg text-xs font-medium text-white ${
+            className={`absolute top-0 left-0 px-2 py-1 rounded-br-lg text-xs font-medium text-white z-10 ${
               step.syncStatus === "pending"
                 ? "bg-orange-500"
                 : step.syncStatus === "error"
@@ -241,8 +449,8 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
           </div>
         )}
 
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-4">
+        <AccordionTrigger className="px-6 py-4 hover:no-underline">
+          <div className="flex items-center gap-4 w-full">
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${getStepColor()} text-white shadow-lg`}
             >
@@ -302,58 +510,16 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
                         : "bg-gray-600 text-white border-gray-700"
                     }`}
                   >
-                    {step.status}
+                    {step.status.replace("-", " ").toUpperCase()}
                   </Badge>
-
-                  {/* Sync Status Indicator */}
-                  {step.syncStatus && step.syncStatus !== "synced" && (
-                    <div className="flex items-center gap-1">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          step.syncStatus === "pending"
-                            ? "border-orange-300 bg-orange-50 text-orange-700"
-                            : "border-red-300 bg-red-50 text-red-700"
-                        }`}
-                      >
-                        {step.syncStatus === "pending"
-                          ? "⏳ Pending Sync"
-                          : "❌ Sync Error"}
-                      </Badge>
-
-                      {/* Retry Sync Button */}
-                      {step.syncStatus === "error" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            onUpdateStepStatus(step.id, step.status)
-                          }
-                          className="h-5 w-5 p-0 text-red-600 hover:text-red-700"
-                          title="Retry sync with backend"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  {/* Add any additional badges here if needed */}
                 </div>
-
-                {/* Status Description */}
-                <span className="text-sm text-gray-600">
-                  {step.status === "approved" &&
-                    "✓ Step completed successfully"}
-                  {step.status === "declined" && "✗ Step requires attention"}
-                  {step.status === "awaiting" && "⏳ Waiting for response"}
-                  {step.status === "submitted" && "📋 Under review"}
-                  {step.status === "not-started" && "🔒 Step not yet initiated"}
-                </span>
               </div>
             </div>
           </div>
-        </CardHeader>
+        </AccordionTrigger>
 
-        <CardContent className="space-y-4">
+        <AccordionContent className="px-6 pb-6">
           {/* Step Content Based on State */}
           {stepState === "upcoming" && (
             <div className="p-4 bg-gray-100 rounded-lg">
@@ -448,62 +614,43 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
                           {/* Show status message for rejected/resubmission documents */}
                           {step.documents && step.documents.length > 0 && (
                             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                              <div className="flex items-center gap-2 text-yellow-800">
-                                <AlertTriangle className="h-4 w-4" />
-                                <span className="text-sm font-medium">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                                <span className="text-sm font-medium text-yellow-800">
                                   Document requires attention
                                 </span>
                               </div>
-                              <p className="text-xs text-yellow-700 mt-1">
-                                Previous document was rejected or requires
-                                resubmission. Please upload a new version.
+                              <p className="text-xs text-yellow-700">
+                                The uploaded document has been rejected or
+                                requires resubmission. Please upload a new
+                                document to proceed.
                               </p>
                             </div>
                           )}
 
-                          <div
-                            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                              isUploading
-                                ? "border-gray-300 bg-gray-50"
-                                : "border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
-                            }`}
-                          >
-                            <Upload
-                              className={`h-10 w-10 mx-auto mb-3 ${
-                                isUploading ? "text-gray-400" : "text-blue-500"
-                              }`}
-                            />
-                            <p className="text-sm font-medium text-gray-700 mb-1">
-                              {isUploading
-                                ? "Uploading document..."
-                                : "Upload documents for this step"}
-                            </p>
-                            <p className="text-xs text-gray-500 mb-4">
-                              {step.documents && step.documents.length > 0
-                                ? "Previous document was rejected or requires resubmission. Upload a new version."
-                                : "Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max 10MB)"}
+                          {/* File Upload Input */}
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <p className="text-sm text-gray-600 mb-4">
+                              Upload documents for this step
                             </p>
                             <div className="flex items-center justify-center">
-                              <label
-                                htmlFor={`file-input-${step.id}`}
-                                className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors ${
-                                  isUploading
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                }`}
-                              >
-                                <Upload className="h-4 w-4 mr-2" />
-                                {isUploading ? "Uploading..." : "Choose File"}
-                              </label>
                               <input
                                 type="file"
-                                onChange={(e) =>
-                                  handleFileInputChange(e, step.title)
-                                }
+                                onChange={(e) => {
+                                  const backendStepName = getBackendStepName(
+                                    step.title
+                                  );
+                                  console.log("📁 File Upload Debug:", {
+                                    frontendTitle: step.title,
+                                    backendStepName,
+                                    stepId: step.id,
+                                  });
+                                  handleFileInputChange(e, backendStepName);
+                                }}
                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                className="hidden"
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                 disabled={isUploading}
-                                id={`file-input-${step.id}`}
                               />
                             </div>
                           </div>
@@ -513,227 +660,155 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
                   </>
                 )}
 
-                {/* Uploaded documents */}
-                {step.documents && step.documents.length > 0 ? (
-                  <div className="space-y-2">
-                    <h5 className="text-sm font-medium text-gray-700">
+                {/* Documents List */}
+                {step.documents && step.documents.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <h5 className="font-medium text-sm text-gray-700">
                       Uploaded Documents:
                     </h5>
-                    {step.documents.map((document, docIndex) => (
+                    {step.documents.map((document) => (
                       <div
-                        key={docIndex}
-                        className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                        key={document._id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
                           <FileText className="h-4 w-4 text-blue-600" />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">
-                              {document.name ||
-                                document.documentName ||
-                                "Document"}
+                          <div>
+                            <span className="font-medium text-sm">
+                              {document.documentName || document.name}
                             </span>
-                            {document.documentType && (
-                              <span className="text-xs text-gray-500">
-                                {document.documentType}
-                              </span>
-                            )}
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {document.documentType}
+                            </Badge>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* View Document Button */}
-                          {document.url ||
-                          document.documentUrl ||
-                          document.fileUrl ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const documentUrl =
-                                  document.url ||
-                                  document.documentUrl ||
-                                  document.fileUrl;
-                                if (documentUrl) {
-                                  window.open(documentUrl, "_blank");
-                                }
-                              }}
-                              className="h-7 px-2"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-gray-500 px-2 py-1">
-                              No URL available
-                            </span>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(document.url, "_blank")}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500">
-                    <div className="text-sm font-medium mb-1">No Documents</div>
-                    <div className="text-xs">
-                      No documents uploaded for this step yet
-                    </div>
-                  </div>
                 )}
               </div>
 
-              {/* Notes */}
-              {(step.internalNotes ||
-                step.customerNotes ||
-                stepState === "active") && (
-                <div className="space-y-3">
-                  <h4 className="font-medium">Notes</h4>
-                  {step.status === "approved" ? (
-                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-sm text-green-800">
-                        {step.internalNotes ||
-                          "No internal notes for this approved step."}
-                      </p>
-                      <p className="text-xs text-green-600 mt-2">
-                        ✓ Step approved - notes are read-only
-                      </p>
-                    </div>
-                  ) : stepState === "active" &&
-                    (userRole === "manager" || userRole === "agent") ? (
-                    <Textarea
-                      value={step.internalNotes}
-                      onChange={(e) =>
-                        onUpdateStepNotes(
-                          step.id,
-                          "internalNotes",
-                          e.target.value
-                        )
-                      }
-                      placeholder="Add notes for this step..."
-                      className="min-h-[60px]"
-                    />
-                  ) : step.internalNotes ? (
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm">{step.internalNotes}</p>
-                    </div>
-                  ) : null}
-                </div>
-              )}
+              {/* Notes Section */}
+              <div className="space-y-6 mt-8">
+                <h4 className="font-medium flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Notes
+                </h4>
 
-              {/* Step Status Management - Moved to Bottom */}
-              {isEditable ? (
-                <div className="space-y-4 pt-6 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor={`step-status-${step.id}`}
-                      className="text-base font-semibold text-gray-800"
-                    >
-                      Step Status:
-                    </Label>
-
-                    {/* Warning message when application data is not available */}
-                    {(!applicationData || !applicationData.applicationId) && (
-                      <div className="flex items-center gap-1 text-xs text-orange-600">
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-                          />
-                        </svg>
-                        <span>Data not loaded</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Select
-                            value={step.status}
-                            onValueChange={(value) =>
-                              onUpdateStepStatus(
-                                step.id,
-                                value as WorkflowStepType["status"]
-                              )
-                            }
-                            disabled={
-                              !applicationData || !applicationData.applicationId
-                            }
-                          >
-                            <SelectTrigger className="h-12 w-[200px] text-base font-medium">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="not-started">
-                                Not Started
-                              </SelectItem>
-                              <SelectItem value="submitted">
-                                Submitted for Review
-                              </SelectItem>
-                              <SelectItem value="awaiting">
-                                Awaiting Response
-                              </SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="declined">Declined</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {!applicationData || !applicationData.applicationId
-                              ? "Application data not loaded. Please wait or refresh the page."
-                              : "Update the current step status"}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <span className="text-sm text-gray-600 font-medium">
-                      Update the current step status
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                // Show approved status message when step is approved
-                <div className="space-y-4 pt-6 border-t border-gray-200">
+                {/* Add New Note */}
+                <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="h-5 w-5" />
-                      <span className="font-semibold">Step Approved</span>
-                    </div>
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-800"
+                    <Textarea
+                      placeholder="Add a note for this step..."
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      className="flex-1"
+                      rows={2}
+                    />
+                    <Button
+                      onClick={addNote}
+                      disabled={!newNote.trim() || isAddingNote}
+                      size="sm"
+                      className="px-4"
                     >
-                      {step.status}
-                    </Badge>
+                      {isAddingNote ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <p className="text-sm text-gray-600">
-                    This step has been completed and approved. No further
-                    changes are needed.
-                  </p>
                 </div>
-              )}
 
-              {/* Change History */}
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Change History</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  <div className="p-2 bg-gray-50 rounded text-xs text-gray-500">
-                    No change history available
-                  </div>
+                {/* Notes List */}
+                <div className="space-y-3">
+                  {isLoadingNotes ? (
+                    <div className="text-center py-4 text-gray-500">
+                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
+                      Loading notes...
+                    </div>
+                  ) : notes.length > 0 ? (
+                    notes.map((note) => (
+                      <div
+                        key={note._id}
+                        className="p-3 bg-gray-50 rounded-lg border-l-4 border-l-blue-500"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-800 mb-2">
+                              {note.message}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="font-medium">
+                                {note.addedBy?.fullName || "Unknown User"}
+                              </span>
+                              <span>•</span>
+                              <span>{formatDate(note.timestamp)}</span>
+                              <span>•</span>
+                              <Badge variant="outline" className="text-xs">
+                                {note.addedByRole}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">No notes yet</p>
+                      <p className="text-xs">
+                        Add a note to track progress or provide updates
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Status Management */}
+              {stepState === "active" && (
+                <div className="space-y-4 mt-8">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <ClipboardCheck className="h-4 w-4" />
+                    Status Management
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    <Select
+                      value={step.status}
+                      onValueChange={(value) =>
+                        onUpdateStepStatus(step.id, value as any)
+                      }
+                      disabled={isBulkUpdateInProgress}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not-started">Not Started</SelectItem>
+                        <SelectItem value="awaiting">Awaiting</SelectItem>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="declined">Declined</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   );
 };
+
+export { WorkflowStep };
